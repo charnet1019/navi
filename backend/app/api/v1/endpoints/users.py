@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.user_group import UserGroup
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.core.security import hash_password
+from app.utils.password import validate_password
 from app.api.deps import require_superuser, get_current_active_user
 from app.core.permissions import get_user_permissions, invalidate_user_permissions_cache
 from app.models.associations import NavigationGroupPermission, LinkPermission, user_group_members
@@ -23,7 +24,7 @@ from app.config import settings
 
 
 class ResetPasswordRequest(BaseModel):
-    new_password: str = Field(..., min_length=8, max_length=100)
+    new_password: str = Field(..., min_length=1, max_length=100)
 
 
 router = APIRouter()
@@ -97,6 +98,14 @@ async def create_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
+        )
+
+    # Validate password rules
+    pwd_errors = await validate_password(user_data.password, db)
+    if pwd_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="；".join(pwd_errors),
         )
 
     # Create new user
@@ -302,6 +311,14 @@ async def reset_user_password(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        )
+
+    # Validate password rules
+    pwd_errors = await validate_password(body.new_password, db)
+    if pwd_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="；".join(pwd_errors),
         )
 
     user.hashed_password = hash_password(body.new_password)

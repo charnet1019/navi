@@ -14,7 +14,14 @@ from app.api.deps import require_superuser
 
 router = APIRouter()
 
-PUBLIC_SETTING_KEYS = {"site_title", "login_title", "login_bg_image", "links_per_row", "copyright_info", "icp_number", "icp_link"}
+PUBLIC_SETTING_KEYS = {
+    "site_title", "login_title", "login_bg_image", "links_per_row",
+    "copyright_info", "icp_number", "icp_link",
+    "max_login_attempts", "login_lockout_minutes",
+    "password_min_length", "password_require_uppercase",
+    "password_require_lowercase", "password_require_digit",
+    "password_require_special",
+}
 
 
 @router.get("/public", response_model=List[SystemSettingResponse])

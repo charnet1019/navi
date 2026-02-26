@@ -73,6 +73,70 @@
             </a-form-item>
           </a-form>
         </a-card>
+        <a-card title="登录限制" style="margin-top: 24px">
+          <a-form layout="vertical">
+            <a-form-item label="最大登录失败次数">
+              <a-input-number
+                v-model:value="formState.max_login_attempts"
+                :min="1"
+                :max="20"
+                style="width: 200px"
+              />
+              <div class="field-hint">连续登录失败达到此次数后，账号将被临时锁定</div>
+            </a-form-item>
+
+            <a-form-item label="锁定时间（分钟）">
+              <a-input-number
+                v-model:value="formState.login_lockout_minutes"
+                :min="1"
+                :max="1440"
+                style="width: 200px"
+              />
+              <div class="field-hint">账号被锁定后需要等待的时间</div>
+            </a-form-item>
+
+            <a-form-item>
+              <a-button type="primary" :loading="saving" @click="handleSave">
+                保存
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-card>
+
+        <a-card title="密码规则" style="margin-top: 24px">
+          <a-form layout="vertical">
+            <a-form-item label="密码最小长度">
+              <a-input-number
+                v-model:value="formState.password_min_length"
+                :min="4"
+                :max="32"
+                style="width: 200px"
+              />
+            </a-form-item>
+
+            <a-form-item label="必须包含大写字母">
+              <a-switch v-model:checked="formState.password_require_uppercase" />
+            </a-form-item>
+
+            <a-form-item label="必须包含小写字母">
+              <a-switch v-model:checked="formState.password_require_lowercase" />
+            </a-form-item>
+
+            <a-form-item label="必须包含数字">
+              <a-switch v-model:checked="formState.password_require_digit" />
+            </a-form-item>
+
+            <a-form-item label="必须包含特殊字符">
+              <a-switch v-model:checked="formState.password_require_special" />
+            </a-form-item>
+
+            <a-form-item>
+              <a-button type="primary" :loading="saving" @click="handleSave">
+                保存
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-card>
       </a-spin>
     </div>
   </AppLayout>
@@ -97,7 +161,14 @@ const formState = reactive({
   links_per_row: 5,
   copyright_info: '',
   icp_number: '',
-  icp_link: ''
+  icp_link: '',
+  max_login_attempts: 3,
+  login_lockout_minutes: 30,
+  password_min_length: 6,
+  password_require_uppercase: true,
+  password_require_lowercase: true,
+  password_require_digit: true,
+  password_require_special: true,
 })
 
 onMounted(async () => {
@@ -111,6 +182,13 @@ onMounted(async () => {
     formState.copyright_info = settingsStore.copyrightInfo
     formState.icp_number = settingsStore.icpNumber
     formState.icp_link = settingsStore.icpLink
+    formState.max_login_attempts = settingsStore.maxLoginAttempts
+    formState.login_lockout_minutes = settingsStore.loginLockoutMinutes
+    formState.password_min_length = settingsStore.passwordMinLength
+    formState.password_require_uppercase = settingsStore.passwordRequireUppercase
+    formState.password_require_lowercase = settingsStore.passwordRequireLowercase
+    formState.password_require_digit = settingsStore.passwordRequireDigit
+    formState.password_require_special = settingsStore.passwordRequireSpecial
   } catch {
     message.error('加载设置失败')
   } finally {
@@ -128,7 +206,14 @@ const handleSave = async () => {
       settingsStore.updateSetting('links_per_row', { value: String(formState.links_per_row) }),
       settingsStore.updateSetting('copyright_info', { value: formState.copyright_info }),
       settingsStore.updateSetting('icp_number', { value: formState.icp_number }),
-      settingsStore.updateSetting('icp_link', { value: formState.icp_link })
+      settingsStore.updateSetting('icp_link', { value: formState.icp_link }),
+      settingsStore.updateSetting('max_login_attempts', { value: String(formState.max_login_attempts) }),
+      settingsStore.updateSetting('login_lockout_minutes', { value: String(formState.login_lockout_minutes) }),
+      settingsStore.updateSetting('password_min_length', { value: String(formState.password_min_length) }),
+      settingsStore.updateSetting('password_require_uppercase', { value: String(formState.password_require_uppercase) }),
+      settingsStore.updateSetting('password_require_lowercase', { value: String(formState.password_require_lowercase) }),
+      settingsStore.updateSetting('password_require_digit', { value: String(formState.password_require_digit) }),
+      settingsStore.updateSetting('password_require_special', { value: String(formState.password_require_special) }),
     ])
     message.success('设置已保存')
   } catch {

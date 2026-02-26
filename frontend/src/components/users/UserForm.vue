@@ -139,8 +139,7 @@ const rules: Record<string, Rule[]> = {
     { min: 1, max: 100, message: '姓名长度需在1到100个字符之间', trigger: 'blur' }
   ],
   password: [
-    { required: !isEdit.value, message: '请输入密码', trigger: 'blur' },
-    { min: 8, message: '密码至少需要8个字符', trigger: 'blur' }
+    { required: !isEdit.value, message: '请输入密码', trigger: 'blur' }
   ]
 }
 

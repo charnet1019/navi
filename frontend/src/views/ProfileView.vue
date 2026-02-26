@@ -107,8 +107,7 @@ const passwordRules: Record<string, Rule[]> = {
     { required: true, message: '请输入当前密码', trigger: 'blur' }
   ],
   new_password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码至少需要8个字符', trigger: 'blur' }
+    { required: true, message: '请输入新密码', trigger: 'blur' }
   ],
   confirm_password: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
@@ -127,8 +126,9 @@ const handlePasswordChange = async () => {
     passwordForm.current_password = ''
     passwordForm.new_password = ''
     passwordForm.confirm_password = ''
-  } catch (error) {
-    message.error('修改密码失败')
+  } catch (err: unknown) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    message.error(axiosErr.response?.data?.detail || '修改密码失败')
   } finally {
     loading.value = false
   }

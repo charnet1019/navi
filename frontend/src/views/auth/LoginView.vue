@@ -104,8 +104,10 @@ const handleSubmit = async () => {
     message.success('登录成功')
     const redirect = route.query.redirect as string || '/'
     router.push(redirect)
-  } catch (error) {
-    message.error('登录失败，请检查用户名和密码')
+  } catch (err: unknown) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    const detail = axiosErr.response?.data?.detail
+    message.error(detail || '登录失败，请检查用户名和密码')
   }
 }
 </script>

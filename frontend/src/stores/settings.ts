@@ -59,6 +59,42 @@ export const useSettingsStore = defineStore('settings', () => {
     return setting?.value || ''
   })
 
+  // Login & password rule settings
+  const maxLoginAttempts = computed(() => {
+    const setting = settingsMap.value['max_login_attempts']
+    return setting ? parseInt(setting.value, 10) : 3
+  })
+
+  const loginLockoutMinutes = computed(() => {
+    const setting = settingsMap.value['login_lockout_minutes']
+    return setting ? parseInt(setting.value, 10) : 30
+  })
+
+  const passwordMinLength = computed(() => {
+    const setting = settingsMap.value['password_min_length']
+    return setting ? parseInt(setting.value, 10) : 6
+  })
+
+  const passwordRequireUppercase = computed(() => {
+    const setting = settingsMap.value['password_require_uppercase']
+    return setting ? setting.value === 'true' : true
+  })
+
+  const passwordRequireLowercase = computed(() => {
+    const setting = settingsMap.value['password_require_lowercase']
+    return setting ? setting.value === 'true' : true
+  })
+
+  const passwordRequireDigit = computed(() => {
+    const setting = settingsMap.value['password_require_digit']
+    return setting ? setting.value === 'true' : true
+  })
+
+  const passwordRequireSpecial = computed(() => {
+    const setting = settingsMap.value['password_require_special']
+    return setting ? setting.value === 'true' : true
+  })
+
   // Actions
   async function fetchPublicSettings(): Promise<void> {
     try {
@@ -117,6 +153,13 @@ export const useSettingsStore = defineStore('settings', () => {
     copyrightInfo,
     icpNumber,
     icpLink,
+    maxLoginAttempts,
+    loginLockoutMinutes,
+    passwordMinLength,
+    passwordRequireUppercase,
+    passwordRequireLowercase,
+    passwordRequireDigit,
+    passwordRequireSpecial,
     loading,
     error,
     fetchPublicSettings,

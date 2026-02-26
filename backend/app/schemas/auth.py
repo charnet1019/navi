@@ -19,4 +19,4 @@ class TokenResponse(BaseModel):
 class PasswordChangeRequest(BaseModel):
     """Password change request schema."""
     current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=8, max_length=100)
+    new_password: str = Field(..., min_length=1, max_length=100)

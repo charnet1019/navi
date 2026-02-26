@@ -116,8 +116,9 @@ const handleSubmit = async (values: CreateUserRequest | UpdateUserRequest) => {
     }
     modalOpen.value = false
     selectedUser.value = null
-  } catch (error) {
-    message.error(selectedUser.value ? '更新用户失败' : '创建用户失败')
+  } catch (err: unknown) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    message.error(axiosErr.response?.data?.detail || (selectedUser.value ? '更新用户失败' : '创建用户失败'))
   }
 }
 
@@ -155,11 +156,6 @@ const handleResetPasswordSubmit = async () => {
     return
   }
 
-  if (newPassword.value.length < 8) {
-    message.error('密码至少需要8个字符')
-    return
-  }
-
   try {
     await usersStore.resetPassword(resetPasswordUserId.value, {
       new_password: newPassword.value
@@ -168,8 +164,9 @@ const handleResetPasswordSubmit = async () => {
     resetPasswordModalOpen.value = false
     resetPasswordUserId.value = null
     newPassword.value = ''
-  } catch (error) {
-    message.error('重置密码失败')
+  } catch (err: unknown) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    message.error(axiosErr.response?.data?.detail || '重置密码失败')
   }
 }
 
