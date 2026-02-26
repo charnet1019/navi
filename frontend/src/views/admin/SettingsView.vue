@@ -1,0 +1,152 @@
+<template>
+  <AppLayout>
+    <div class="settings-view">
+      <a-typography-title :level="2">系统设置</a-typography-title>
+
+      <a-spin :spinning="loading">
+        <a-card title="基本设置">
+          <a-form layout="vertical">
+            <a-form-item label="站点标题">
+              <a-input
+                v-model:value="formState.site_title"
+                placeholder="请输入站点标题"
+                style="max-width: 400px"
+              />
+              <div class="field-hint">显示在页面左上角的标题文字</div>
+            </a-form-item>
+
+            <a-form-item label="登录页标题">
+              <a-input
+                v-model:value="formState.login_title"
+                placeholder="留空则使用站点标题"
+                style="max-width: 400px"
+              />
+              <div class="field-hint">登录页面登录框上方显示的标题，留空则使用站点标题</div>
+            </a-form-item>
+
+            <a-form-item label="登录页背景图片">
+              <ImageUpload v-model="formState.login_bg_image" />
+              <div class="field-hint">上传登录页面的背景图片，留空则使用默认背景色</div>
+            </a-form-item>
+
+            <a-form-item label="每行链接数">
+              <a-input-number
+                v-model:value="formState.links_per_row"
+                :min="1"
+                :max="12"
+                style="width: 200px"
+              />
+              <div class="field-hint">首页每行显示的链接卡片数量</div>
+            </a-form-item>
+
+            <a-form-item label="版权信息">
+              <a-input
+                v-model:value="formState.copyright_info"
+                placeholder="留空则不显示"
+                style="max-width: 400px"
+              />
+              <div class="field-hint">登录页底部显示的版权或版本信息</div>
+            </a-form-item>
+
+            <a-form-item label="备案号">
+              <a-input
+                v-model:value="formState.icp_number"
+                placeholder="留空则不显示"
+                style="max-width: 400px"
+              />
+              <div class="field-hint">登录页底部显示的ICP备案号</div>
+            </a-form-item>
+
+            <a-form-item label="备案链接">
+              <a-input
+                v-model:value="formState.icp_link"
+                placeholder="例如 https://beian.miit.gov.cn/"
+                style="max-width: 400px"
+              />
+              <div class="field-hint">点击备案号跳转的链接地址</div>
+            </a-form-item>
+
+            <a-form-item>
+              <a-button type="primary" :loading="saving" @click="handleSave">
+                保存
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-card>
+      </a-spin>
+    </div>
+  </AppLayout>
+</template>
+
+<script setup lang="ts">
+import { reactive, ref, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import ImageUpload from '@/components/common/ImageUpload.vue'
+import { useSettingsStore } from '@/stores/settings'
+
+const settingsStore = useSettingsStore()
+
+const loading = ref(false)
+const saving = ref(false)
+
+const formState = reactive({
+  site_title: 'Navi',
+  login_title: '',
+  login_bg_image: '',
+  links_per_row: 5,
+  copyright_info: '',
+  icp_number: '',
+  icp_link: ''
+})
+
+onMounted(async () => {
+  try {
+    loading.value = true
+    await settingsStore.fetchSettings()
+    formState.site_title = settingsStore.siteTitle
+    formState.login_title = settingsStore.loginTitle
+    formState.login_bg_image = settingsStore.loginBgImage
+    formState.links_per_row = settingsStore.linksPerRow
+    formState.copyright_info = settingsStore.copyrightInfo
+    formState.icp_number = settingsStore.icpNumber
+    formState.icp_link = settingsStore.icpLink
+  } catch {
+    message.error('加载设置失败')
+  } finally {
+    loading.value = false
+  }
+})
+
+const handleSave = async () => {
+  try {
+    saving.value = true
+    await Promise.all([
+      settingsStore.updateSetting('site_title', { value: formState.site_title }),
+      settingsStore.updateSetting('login_title', { value: formState.login_title }),
+      settingsStore.updateSetting('login_bg_image', { value: formState.login_bg_image }),
+      settingsStore.updateSetting('links_per_row', { value: String(formState.links_per_row) }),
+      settingsStore.updateSetting('copyright_info', { value: formState.copyright_info }),
+      settingsStore.updateSetting('icp_number', { value: formState.icp_number }),
+      settingsStore.updateSetting('icp_link', { value: formState.icp_link })
+    ])
+    message.success('设置已保存')
+  } catch {
+    message.error('保存设置失败')
+  } finally {
+    saving.value = false
+  }
+}
+</script>
+
+<style scoped>
+.settings-view {
+  padding: 24px;
+}
+
+.field-hint {
+  color: #999;
+  font-size: 12px;
+  margin-top: 4px;
+}
+</style>
