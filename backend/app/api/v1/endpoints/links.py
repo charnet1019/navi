@@ -16,6 +16,7 @@ from app.schemas.link import LinkCreate, LinkUpdate, LinkResponse
 from app.schemas.permission import GrantPermissionRequest, LinkPermissionResponse
 from app.api.deps import require_superuser, get_current_active_user
 from app.config import settings
+from app.utils.files import delete_upload_file
 
 
 router = APIRouter()
@@ -296,6 +297,7 @@ async def delete_link(
             detail="Link not found",
         )
 
+    delete_upload_file(link.icon_path)
     await db.delete(link)
     await db.commit()
 

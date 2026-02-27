@@ -18,6 +18,7 @@ from app.schemas.navigation_group import (
     NavigationGroupUpdate,
     NavigationGroupResponse,
 )
+from app.utils.files import delete_upload_file
 from app.schemas.permission import (
     GrantPermissionRequest,
     NavGroupPermissionResponse,
@@ -422,6 +423,15 @@ async def delete_navigation_group(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Navigation group not found",
         )
+
+    # Delete group icon file
+    delete_upload_file(group.icon)
+
+    # Delete icon files for all links in this group
+    links_stmt = select(Link).where(Link.navigation_group_id == group_id)
+    links_result = await db.execute(links_stmt)
+    for link in links_result.scalars():
+        delete_upload_file(link.icon_path)
 
     await db.delete(group)
     await db.commit()

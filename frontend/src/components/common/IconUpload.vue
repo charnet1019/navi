@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { PlusOutlined, LoadingOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { uploadsApi } from '@/api/uploads'
@@ -38,11 +38,17 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const uploading = ref(false)
+const savedUrl = ref(props.modelValue || '')
+const pendingUrl = ref('')
 
-const imageUrl = computed(() => {
-  if (!props.modelValue) return ''
-  if (props.modelValue.startsWith('http')) return props.modelValue
-  return props.modelValue
+const imageUrl = computed(() => props.modelValue || '')
+
+// Sync savedUrl when parent sets value (e.g. from DB fetch)
+watch(() => props.modelValue, (newVal) => {
+  const val = newVal || ''
+  if (val !== pendingUrl.value) {
+    savedUrl.value = val
+  }
 })
 
 const handleBeforeUpload = async (file: File) => {
@@ -59,7 +65,11 @@ const handleBeforeUpload = async (file: File) => {
 
   uploading.value = true
   try {
+    if (pendingUrl.value) {
+      try { await uploadsApi.deleteImage(pendingUrl.value) } catch { /* ignore */ }
+    }
     const res = await uploadsApi.uploadImage(file)
+    pendingUrl.value = res.url
     emit('update:modelValue', res.url)
   } catch {
     message.error('上传失败')
@@ -68,6 +78,30 @@ const handleBeforeUpload = async (file: File) => {
   }
   return false
 }
+
+const commit = () => {
+  const currentUrl = props.modelValue || ''
+  const oldSavedUrl = savedUrl.value
+  if (oldSavedUrl && oldSavedUrl !== currentUrl) {
+    uploadsApi.deleteImage(oldSavedUrl).catch(() => { /* ignore */ })
+  }
+  savedUrl.value = currentUrl
+  pendingUrl.value = ''
+}
+
+const cleanup = async () => {
+  if (pendingUrl.value && pendingUrl.value !== savedUrl.value) {
+    try { await uploadsApi.deleteImage(pendingUrl.value) } catch { /* ignore */ }
+    pendingUrl.value = ''
+    emit('update:modelValue', savedUrl.value)
+  }
+}
+
+onBeforeUnmount(() => {
+  cleanup()
+})
+
+defineExpose({ commit, cleanup })
 </script>
 
 <style scoped>

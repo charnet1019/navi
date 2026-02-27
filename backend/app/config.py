@@ -1,5 +1,5 @@
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -23,10 +23,21 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost", "http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: str = "*"
+
+    @computed_field
+    @property
+    def cors_origins_list(self) -> list[str]:
+        v = self.CORS_ORIGINS.strip()
+        if not v:
+            return []
+        if v.startswith("["):
+            import json
+            return json.loads(v)
+        return [s.strip() for s in v.split(",")]
 
     # File Upload
-    UPLOAD_DIR: str = "/opt/images"
+    UPLOAD_DIR: str = "/app/uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 

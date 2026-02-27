@@ -23,7 +23,7 @@
     <a-row :gutter="16" align="bottom">
       <a-col :span="6">
         <a-form-item label="图标" name="icon">
-          <IconUpload v-model="formState.icon" />
+          <IconUpload ref="iconUploadRef" v-model="formState.icon" />
         </a-form-item>
       </a-col>
       <a-col :span="8">
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import IconUpload from '@/components/common/IconUpload.vue'
 import type { NavigationGroup, CreateNavigationGroupRequest, UpdateNavigationGroupRequest } from '@/types'
@@ -73,6 +73,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+const iconUploadRef = ref<InstanceType<typeof IconUpload>>()
 
 interface FormState {
   name: string
@@ -111,10 +112,12 @@ const handleSubmit = () => {
     icon: formState.icon || undefined,
     sort_order: formState.sort_order
   }
+  iconUploadRef.value?.commit()
   emit('submit', values)
 }
 
 const handleCancel = () => {
+  iconUploadRef.value?.cleanup()
   emit('cancel')
 }
 </script>

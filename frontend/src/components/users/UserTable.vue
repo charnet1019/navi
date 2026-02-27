@@ -5,7 +5,7 @@
       :data-source="users"
       :loading="loading"
       :pagination="paginationConfig"
-      :row-key="(record) => record.id"
+      :row-key="(record: User) => record.id"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">

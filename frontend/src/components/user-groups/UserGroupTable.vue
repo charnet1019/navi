@@ -4,7 +4,7 @@
       :columns="columns"
       :data-source="userGroups"
       :loading="loading"
-      :row-key="(record) => record.id"
+      :row-key="(record: UserGroup) => record.id"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'created_at'">

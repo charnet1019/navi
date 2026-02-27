@@ -15,5 +15,12 @@ export const uploadsApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     return response.data
+  },
+
+  async deleteImage(url: string): Promise<void> {
+    const filename = url.split('/').pop()
+    if (filename) {
+      await apiClient.delete(`/uploads/images/${filename}`)
+    }
   }
 }

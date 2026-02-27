@@ -5,7 +5,7 @@
       :data-source="links"
       :loading="loading"
       :pagination="paginationConfig"
-      :row-key="(record) => record.id"
+      :row-key="(record: Link) => record.id"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">

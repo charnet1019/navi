@@ -16,7 +16,7 @@ async function ensureUser(): Promise<boolean> {
 
 export async function authGuard(
   to: RouteLocationNormalized,
-  from: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ): Promise<void> {
   const authenticated = await ensureUser()
@@ -30,7 +30,7 @@ export async function authGuard(
 
 export async function adminGuard(
   to: RouteLocationNormalized,
-  from: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ): Promise<void> {
   const authenticated = await ensureUser()
@@ -46,8 +46,8 @@ export async function adminGuard(
 }
 
 export async function guestGuard(
-  to: RouteLocationNormalized,
-  from: RouteLocationNormalized,
+  _to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ): Promise<void> {
   const authenticated = await ensureUser()

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { favoritesApi } from '@/api/favorites'
 import type { Link } from '@/types'
 

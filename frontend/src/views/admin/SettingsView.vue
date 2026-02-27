@@ -25,7 +25,7 @@
             </a-form-item>
 
             <a-form-item label="登录页背景图片">
-              <ImageUpload v-model="formState.login_bg_image" />
+              <ImageUpload ref="imageUploadRef" v-model="formState.login_bg_image" />
               <div class="field-hint">上传登录页面的背景图片，留空则使用默认背景色</div>
             </a-form-item>
 
@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, watch, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
@@ -153,6 +153,8 @@ const settingsStore = useSettingsStore()
 
 const loading = ref(false)
 const saving = ref(false)
+const imageUploadRef = ref<InstanceType<typeof ImageUpload>>()
+const bgImageLoaded = ref(false)
 
 const formState = reactive({
   site_title: 'Navi',
@@ -189,11 +191,21 @@ onMounted(async () => {
     formState.password_require_lowercase = settingsStore.passwordRequireLowercase
     formState.password_require_digit = settingsStore.passwordRequireDigit
     formState.password_require_special = settingsStore.passwordRequireSpecial
+    bgImageLoaded.value = true
   } catch {
     message.error('加载设置失败')
   } finally {
     loading.value = false
   }
+})
+
+// Auto-save background image on upload/clear so changes persist immediately
+watch(() => formState.login_bg_image, async (newVal) => {
+  if (!bgImageLoaded.value) return
+  try {
+    await settingsStore.updateSetting('login_bg_image', { value: newVal })
+    imageUploadRef.value?.commit()
+  } catch { /* will be saved with the form */ }
 })
 
 const handleSave = async () => {
@@ -216,6 +228,7 @@ const handleSave = async () => {
       settingsStore.updateSetting('password_require_special', { value: String(formState.password_require_special) }),
     ])
     message.success('设置已保存')
+    imageUploadRef.value?.commit()
   } catch {
     message.error('保存设置失败')
   } finally {
