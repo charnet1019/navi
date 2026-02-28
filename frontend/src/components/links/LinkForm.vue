@@ -28,34 +28,21 @@
     </a-form-item>
 
     <a-form-item label="导航分组" name="navigation_group_id" required>
-      <a-select
+      <a-tree-select
         v-model:value="formState.navigation_group_id"
-        placeholder="请选择导航分组"
+        :tree-data="groupTreeData"
         :loading="groupsLoading"
-      >
-        <a-select-option
-          v-for="group in groups"
-          :key="group.id"
-          :value="group.id"
-        >
-          {{ group.name }}
-        </a-select-option>
-      </a-select>
+        placeholder="请选择导航分组"
+        tree-default-expand-all
+        :field-names="{ label: 'name', value: 'id', children: 'children' }"
+        style="width: 100%"
+      />
     </a-form-item>
 
     <a-row :gutter="16" align="bottom">
       <a-col :span="4">
         <a-form-item label="图标" name="icon_path">
           <IconUpload ref="iconUploadRef" v-model="formState.icon_path" />
-        </a-form-item>
-      </a-col>
-      <a-col :span="8">
-        <a-form-item label="排序" name="sort_order">
-          <a-input-number
-            v-model:value="formState.sort_order"
-            :min="0"
-            style="width: 100%"
-          />
         </a-form-item>
       </a-col>
       <a-col :span="6">
@@ -79,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import IconUpload from '@/components/common/IconUpload.vue'
 import type { Link, CreateLinkRequest, UpdateLinkRequest, NavigationGroup } from '@/types'
@@ -107,6 +94,21 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 const iconUploadRef = ref<InstanceType<typeof IconUpload>>()
+
+// Build tree data from flat groups list
+const groupTreeData = computed(() => {
+  const map = new Map<string, NavigationGroup & { children: NavigationGroup[] }>()
+  const roots: (NavigationGroup & { children: NavigationGroup[] })[] = []
+  props.groups.forEach(g => map.set(g.id, { ...g, children: [] }))
+  map.forEach(g => {
+    if (g.parent_id && map.has(g.parent_id)) {
+      map.get(g.parent_id)!.children.push(g)
+    } else {
+      roots.push(g)
+    }
+  })
+  return roots.sort((a, b) => a.sort_order - b.sort_order)
+})
 
 interface FormState {
   name: string

@@ -4,6 +4,7 @@
     :title="title"
     :width="700"
     :footer="null"
+    destroy-on-close
     @cancel="handleCancel"
   >
     <LinkForm

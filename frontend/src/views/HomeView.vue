@@ -22,6 +22,7 @@
           @edit="handleEditLink"
           @delete="handleDeleteLink"
           @toggle-favorite="handleToggleFavorite"
+          @reorder="handleReorderLinks"
         />
       </div>
       <div v-else class="favorites-section">
@@ -160,6 +161,14 @@ const handleToggleFavorite = async (linkId: string) => {
     await favoritesStore.fetchFavoriteLinks()
   } catch {
     message.error('更新收藏失败')
+  }
+}
+
+const handleReorderLinks = async (orderedIds: string[]) => {
+  try {
+    await linksStore.reorderLinks(orderedIds)
+  } catch {
+    message.error('排序失败')
   }
 }
 </script>

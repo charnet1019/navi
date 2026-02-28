@@ -3,6 +3,20 @@ import { ref, computed } from 'vue'
 import { navigationApi } from '@/api/navigation'
 import type { NavigationGroup, CreateNavigationGroupRequest, UpdateNavigationGroupRequest } from '@/types'
 
+function buildTree(flat: NavigationGroup[]): NavigationGroup[] {
+  const map = new Map<string, NavigationGroup>()
+  const roots: NavigationGroup[] = []
+  flat.forEach(g => map.set(g.id, { ...g, children: [] }))
+  map.forEach(g => {
+    if (g.parent_id && map.has(g.parent_id)) {
+      map.get(g.parent_id)!.children!.push(g)
+    } else {
+      roots.push(g)
+    }
+  })
+  return roots.sort((a, b) => a.sort_order - b.sort_order)
+}
+
 export const useNavigationStore = defineStore('navigation', () => {
   const groups = ref<NavigationGroup[]>([])
   const selectedGroupId = ref<string | null>(null)
@@ -16,6 +30,10 @@ export const useNavigationStore = defineStore('navigation', () => {
 
   const activeGroups = computed(() =>
     groups.value.filter(g => g.is_active).sort((a, b) => a.sort_order - b.sort_order)
+  )
+
+  const groupTree = computed(() =>
+    buildTree(groups.value.filter(g => g.is_active))
   )
 
   async function fetchGroups(params?: { skip?: number; limit?: number; is_active?: boolean }): Promise<void> {
@@ -107,6 +125,7 @@ export const useNavigationStore = defineStore('navigation', () => {
     selectedGroupId,
     selectedGroup,
     activeGroups,
+    groupTree,
     loading,
     fetched,
     error,

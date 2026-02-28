@@ -38,5 +38,10 @@ export const linksApi = {
   async listByGroup(groupId: string): Promise<Link[]> {
     const response = await apiClient.get<Link[]>(`/links/by-group/${groupId}`)
     return response.data
+  },
+
+  async reorder(items: { id: string; sort_order: number }[]): Promise<Link[]> {
+    const response = await apiClient.put<Link[]>('/links/reorder', items)
+    return response.data
   }
 }

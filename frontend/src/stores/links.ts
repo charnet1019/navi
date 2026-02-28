@@ -92,6 +92,21 @@ export const useLinksStore = defineStore('links', () => {
     }
   }
 
+  async function reorderLinks(orderedIds: string[]): Promise<void> {
+    const items = orderedIds.map((id, index) => ({ id, sort_order: index }))
+    try {
+      const updated = await linksApi.reorder(items)
+      links.value = links.value.map(l => {
+        const u = updated.find(x => x.id === l.id)
+        return u ?? l
+      })
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reorder links'
+      error.value = errorMessage
+      throw err
+    }
+  }
+
   return {
     links,
     linksByGroup,
@@ -101,6 +116,7 @@ export const useLinksStore = defineStore('links', () => {
     fetchLinks,
     createLink,
     updateLink,
-    deleteLink
+    deleteLink,
+    reorderLinks
   }
 })

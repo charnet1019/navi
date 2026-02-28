@@ -3,16 +3,18 @@
     <div class="nav-groups-view">
       <div class="header">
         <a-typography-title :level="2">导航分组</a-typography-title>
-        <a-button type="primary" @click="handleCreate">
-          创建导航分组
+        <a-button type="primary" @click="handleCreate()">
+          创建顶级分组
         </a-button>
       </div>
 
       <a-table
         :columns="columns"
-        :data-source="navigationStore.groups"
+        :data-source="treeData"
         :loading="navigationStore.loading"
         row-key="id"
+        :default-expand-all-rows="true"
+        :pagination="false"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'is_active'">
@@ -22,6 +24,7 @@
           </template>
           <template v-if="column.key === 'actions'">
             <a-space>
+              <a-button size="small" @click="handleAddChild(record)">添加子分组</a-button>
               <a-button size="small" @click="handleEdit(record)">编辑</a-button>
               <a-button size="small" danger @click="handleDelete(record)">删除</a-button>
             </a-space>
@@ -31,12 +34,15 @@
 
       <a-modal
         v-model:open="modalOpen"
-        :title="selectedGroup ? '编辑导航分组' : '创建导航分组'"
+        :title="modalTitle"
         :footer="null"
         destroy-on-close
       >
         <NavigationGroupForm
           :initial-values="selectedGroup || undefined"
+          :default-parent-id="defaultParentId"
+          :groups="navigationStore.groups"
+          :groups-loading="navigationStore.loading"
           :loading="navigationStore.loading"
           :submit-text="selectedGroup ? '更新' : '创建'"
           @submit="handleSubmit"
@@ -48,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import NavigationGroupForm from '@/components/navigation/NavigationGroupForm.vue'
@@ -59,30 +65,69 @@ const navigationStore = useNavigationStore()
 
 const modalOpen = ref(false)
 const selectedGroup = ref<NavigationGroup | null>(null)
+const defaultParentId = ref<string | null>(null)
+
+const modalTitle = computed(() => {
+  if (selectedGroup.value) return '编辑导航分组'
+  if (defaultParentId.value) return '添加子分组'
+  return '创建顶级分组'
+})
+
+// Build tree from flat groups for the table
+function buildTree(flat: NavigationGroup[]): NavigationGroup[] {
+  const map = new Map<string, NavigationGroup & { children: NavigationGroup[] }>()
+  const roots: (NavigationGroup & { children: NavigationGroup[] })[] = []
+  flat.forEach(g => map.set(g.id, { ...g, children: [] }))
+  map.forEach(g => {
+    if (g.parent_id && map.has(g.parent_id)) {
+      map.get(g.parent_id)!.children.push(g)
+    } else {
+      roots.push(g)
+    }
+  })
+  // Remove empty children arrays so a-table doesn't show expand icon for leaf nodes
+  function clean(nodes: (NavigationGroup & { children: NavigationGroup[] })[]): NavigationGroup[] {
+    return nodes.map(n => ({
+      ...n,
+      children: n.children.length ? clean(n.children as (NavigationGroup & { children: NavigationGroup[] })[]) : undefined
+    }))
+  }
+  return clean(roots).sort((a, b) => a.sort_order - b.sort_order)
+}
+
+const treeData = computed(() => buildTree(navigationStore.groups))
 
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
   { title: '描述', dataIndex: 'description', key: 'description' },
   { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 80 },
   { title: '状态', key: 'is_active', width: 100 },
-  { title: '操作', key: 'actions', width: 160 }
+  { title: '操作', key: 'actions', width: 220 }
 ]
 
 onMounted(async () => {
   try {
     await navigationStore.fetchGroups()
-  } catch (error) {
+  } catch {
     message.error('加载导航分组失败')
   }
 })
 
 const handleCreate = () => {
   selectedGroup.value = null
+  defaultParentId.value = null
+  modalOpen.value = true
+}
+
+const handleAddChild = (parent: NavigationGroup) => {
+  selectedGroup.value = null
+  defaultParentId.value = parent.id
   modalOpen.value = true
 }
 
 const handleEdit = (group: NavigationGroup) => {
   selectedGroup.value = group
+  defaultParentId.value = null
   modalOpen.value = true
 }
 
@@ -97,7 +142,8 @@ const handleSubmit = async (values: CreateNavigationGroupRequest | UpdateNavigat
     }
     modalOpen.value = false
     selectedGroup.value = null
-  } catch (error) {
+    defaultParentId.value = null
+  } catch {
     message.error(selectedGroup.value ? '更新失败' : '创建失败')
   }
 }
@@ -105,6 +151,7 @@ const handleSubmit = async (values: CreateNavigationGroupRequest | UpdateNavigat
 const handleModalCancel = () => {
   modalOpen.value = false
   selectedGroup.value = null
+  defaultParentId.value = null
 }
 
 const handleDelete = (group: NavigationGroup) => {
@@ -117,7 +164,7 @@ const handleDelete = (group: NavigationGroup) => {
       try {
         await navigationStore.deleteGroup(group.id)
         message.success('导航分组已删除')
-      } catch (error) {
+      } catch {
         message.error('删除导航分组失败')
       }
     }

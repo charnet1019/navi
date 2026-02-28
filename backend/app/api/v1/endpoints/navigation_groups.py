@@ -133,6 +133,7 @@ async def create_navigation_group(
         icon=group_data.icon,
         sort_order=group_data.sort_order,
         is_active=group_data.is_active,
+        parent_id=group_data.parent_id,
         created_by=current_user.id,
     )
 

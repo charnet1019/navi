@@ -15,13 +15,11 @@
 
       <div class="navigation-groups-section">
         <NavigationGroupList
-          :groups="navigationStore.activeGroups"
+          :groups="navigationStore.groupTree"
           :selected-group-id="navigationStore.selectedGroupId"
           :loading="navigationStore.loading"
           :collapsed="collapsed"
-          :draggable="authStore.isSuperuser"
           @select="handleGroupSelect"
-          @reorder="handleReorder"
         />
       </div>
 
@@ -123,13 +121,7 @@ const handleAdminMenuClick = ({ key }: { key: string }) => {
   router.push({ name: key })
 }
 
-const handleReorder = async (orderedIds: string[]) => {
-  try {
-    await navigationStore.reorderGroups(orderedIds)
-  } catch {
-    message.error('排序保存失败')
-  }
-}
+
 </script>
 
 <style scoped>

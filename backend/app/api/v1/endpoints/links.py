@@ -3,6 +3,7 @@
 from typing import Annotated, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -143,6 +144,38 @@ async def create_link(
     await db.refresh(new_link)
 
     return LinkResponse.model_validate(new_link)
+
+
+class ReorderItem(BaseModel):
+    id: UUID
+    sort_order: int
+
+
+@router.put("/reorder", response_model=List[LinkResponse])
+async def reorder_links(
+    items: List[ReorderItem],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_superuser)],
+) -> List[LinkResponse]:
+    """Batch update sort order for links (admin only)."""
+    stmt = select(Link).where(Link.id.in_([item.id for item in items]))
+    result = await db.execute(stmt)
+    links_map = {l.id: l for l in result.scalars().all()}
+
+    for item in items:
+        link = links_map.get(item.id)
+        if link:
+            link.sort_order = item.sort_order
+
+    await db.commit()
+
+    updated = []
+    for item in items:
+        link = links_map.get(item.id)
+        if link:
+            await db.refresh(link)
+            updated.append(LinkResponse.model_validate(link))
+    return updated
 
 
 @router.get("/{link_id}", response_model=LinkResponse)

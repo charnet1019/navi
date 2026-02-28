@@ -3,11 +3,14 @@
     <div class="authorization-view">
       <a-typography-title :level="2">权限管理</a-typography-title>
 
-      <a-select
+      <a-tree-select
         v-model:value="selectedGroupId"
         placeholder="请选择导航分组"
         style="width: 100%; max-width: 400px; margin-bottom: 24px"
-        :options="groupOptions"
+        :tree-data="groupTreeOptions"
+        :field-names="{ label: 'name', value: 'id', children: 'children' }"
+        tree-default-expand-all
+        allow-clear
         @change="handleGroupChange"
       />
 
@@ -162,10 +165,30 @@ const grantTarget = ref<{ type: 'nav_group' | 'link'; id: string }>({
 
 const ALL_PERMISSION_KEY = '__all__'
 
-const groupOptions = computed(() => [
-  { value: ALL_PERMISSION_KEY, label: '全部（所有导航分组）' },
-  ...navGroups.value.map((g) => ({ value: g.id, label: g.name }))
-])
+const groupTreeOptions = computed(() => {
+  const map = new Map<string, NavigationGroup & { children?: NavigationGroup[] }>()
+  const roots: (NavigationGroup & { children?: NavigationGroup[] })[] = []
+  navGroups.value.forEach(g => map.set(g.id, { ...g, children: [] }))
+  map.forEach(g => {
+    if (g.parent_id && map.has(g.parent_id)) {
+      map.get(g.parent_id)!.children!.push(g)
+    } else {
+      roots.push(g)
+    }
+  })
+  // Remove empty children arrays so leaf nodes don't show expand icon
+  function clean(nodes: (NavigationGroup & { children?: NavigationGroup[] })[]): NavigationGroup[] {
+    return nodes.map(n => ({
+      ...n,
+      children: n.children?.length ? clean(n.children as (NavigationGroup & { children?: NavigationGroup[] })[]) : undefined
+    }))
+  }
+  const tree = clean(roots).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  return [
+    { id: ALL_PERMISSION_KEY, name: '全部（所有导航分组）' },
+    ...tree
+  ]
+})
 
 const permissionColumns = [
   { title: '名称', key: 'target', dataIndex: 'target' },

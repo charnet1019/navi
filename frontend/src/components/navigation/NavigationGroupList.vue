@@ -2,54 +2,27 @@
   <div class="navigation-group-list">
     <a-spin :spinning="loading">
       <draggable
-        v-if="draggable"
         v-model="localGroups"
         item-key="id"
-        :animation="200"
-        handle=".drag-handle"
-        @end="handleDragEnd"
+        :disabled="!isSuperuser"
+        :animation="150"
+        ghost-class="drag-ghost"
+        @end="onReorder"
       >
         <template #item="{ element }">
-          <div
-            class="group-item"
-            :class="{ active: selectedGroupId === element.id.toString() }"
-            @click="handleGroupClick(element.id.toString())"
-          >
-            <HolderOutlined class="drag-handle" />
-            <img
-              v-if="element.icon"
-              :src="element.icon"
-              :alt="element.name"
-              class="group-icon"
-            />
-            <FolderOutlined v-else class="group-item-icon" />
-            <span v-if="!collapsed" class="group-name">{{ element.name }}</span>
-          </div>
+          <NavGroupNode
+            :group="element"
+            :selected-id="selectedGroupId"
+            :collapsed="collapsed"
+            :depth="0"
+            @select="(id) => emit('select', id)"
+          />
         </template>
       </draggable>
-
-      <template v-else>
-        <div
-          v-for="group in groups"
-          :key="group.id"
-          class="group-item"
-          :class="{ active: selectedGroupId === group.id.toString() }"
-          @click="handleGroupClick(group.id.toString())"
-        >
-          <img
-            v-if="group.icon"
-            :src="group.icon"
-            :alt="group.name"
-            class="group-icon"
-          />
-          <FolderOutlined v-else class="group-item-icon" />
-          <span v-if="!collapsed" class="group-name">{{ group.name }}</span>
-        </div>
-      </template>
     </a-spin>
 
     <div v-if="showAddButton" class="add-group-button">
-      <a-button type="primary" block @click="handleAdd">
+      <a-button type="primary" block @click="emit('add')">
         <template #icon><PlusOutlined /></template>
         添加分组
       </a-button>
@@ -58,9 +31,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { PlusOutlined } from '@ant-design/icons-vue'
 import draggable from 'vuedraggable'
-import { FolderOutlined, PlusOutlined, HolderOutlined } from '@ant-design/icons-vue'
+import NavGroupNode from './NavGroupNode.vue'
+import { useNavigationStore } from '@/stores/navigation'
+import { useAuthStore } from '@/stores/auth'
 import type { NavigationGroup } from '@/types'
 
 interface Props {
@@ -69,13 +45,11 @@ interface Props {
   loading?: boolean
   showAddButton?: boolean
   collapsed?: boolean
-  draggable?: boolean
 }
 
 interface Emits {
   (e: 'select', groupId: string): void
   (e: 'add'): void
-  (e: 'reorder', orderedIds: string[]): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -83,28 +57,25 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   showAddButton: false,
   collapsed: false,
-  draggable: false
 })
 
 const emit = defineEmits<Emits>()
+const navigationStore = useNavigationStore()
+const authStore = useAuthStore()
+const isSuperuser = computed(() => authStore.isSuperuser)
 
-const localGroups = ref<NavigationGroup[]>([])
+const localGroups = ref<NavigationGroup[]>([...props.groups])
 
-watch(() => props.groups, (val) => {
-  localGroups.value = [...val]
-}, { immediate: true })
+watch(() => props.groups, (newGroups) => {
+  localGroups.value = [...newGroups]
+}, { deep: true })
 
-const handleGroupClick = (key: string) => {
-  emit('select', key)
-}
-
-const handleAdd = () => {
-  emit('add')
-}
-
-const handleDragEnd = () => {
-  const orderedIds = localGroups.value.map(g => g.id.toString())
-  emit('reorder', orderedIds)
+const onReorder = async () => {
+  try {
+    await navigationStore.reorderGroups(localGroups.value.map(g => g.id))
+  } catch {
+    localGroups.value = [...props.groups]
+  }
 }
 </script>
 
@@ -112,55 +83,7 @@ const handleDragEnd = () => {
 .navigation-group-list {
   display: flex;
   flex-direction: column;
-  height: 100%;
-}
-
-.group-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px 8px 24px;
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  transition: all 0.2s;
-  user-select: none;
-}
-
-.group-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.group-item.active {
-  color: #fff;
-  background: #1677ff;
-}
-
-.group-icon {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.group-item-icon {
-  flex-shrink: 0;
-}
-
-.group-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.drag-handle {
-  cursor: grab;
-  color: rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
-}
-
-.drag-handle:hover {
-  color: rgba(255, 255, 255, 0.65);
+  padding: 4px 0;
 }
 
 .add-group-button {
@@ -168,5 +91,9 @@ const handleDragEnd = () => {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: auto;
 }
-</style>
 
+:deep(.drag-ghost) {
+  opacity: 0.4;
+  background: rgba(255, 255, 255, 0.1);
+}
+</style>

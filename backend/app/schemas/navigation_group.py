@@ -1,7 +1,7 @@
 """Navigation group-related Pydantic schemas."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,7 @@ class NavigationGroupBase(BaseModel):
     icon: Optional[str] = Field(None, max_length=255)
     sort_order: int = Field(default=0, ge=0)
     is_active: bool = True
+    parent_id: Optional[UUID] = None
 
 
 class NavigationGroupCreate(NavigationGroupBase):
@@ -27,6 +28,7 @@ class NavigationGroupUpdate(BaseModel):
     icon: Optional[str] = Field(None, max_length=255)
     sort_order: Optional[int] = Field(None, ge=0)
     is_active: Optional[bool] = None
+    parent_id: Optional[UUID] = None
 
 
 class NavigationGroupResponse(BaseModel):
@@ -37,6 +39,7 @@ class NavigationGroupResponse(BaseModel):
     icon: Optional[str]
     sort_order: int
     is_active: bool
+    parent_id: Optional[UUID]
     created_by: Optional[UUID]
     created_at: datetime
     updated_at: datetime

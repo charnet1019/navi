@@ -65,9 +65,11 @@ export interface NavigationGroup {
   icon: string | null
   sort_order: number
   is_active: boolean
+  parent_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
+  children?: NavigationGroup[]
 }
 
 export interface CreateNavigationGroupRequest {
@@ -76,6 +78,7 @@ export interface CreateNavigationGroupRequest {
   icon?: string
   sort_order?: number
   is_active?: boolean
+  parent_id?: string | null
 }
 
 export interface UpdateNavigationGroupRequest {
@@ -84,6 +87,7 @@ export interface UpdateNavigationGroupRequest {
   icon?: string
   sort_order?: number
   is_active?: boolean
+  parent_id?: string | null
 }
 
 // Link types
