@@ -122,10 +122,18 @@ async def create_user(
     await db.flush()
 
     # Assign user to groups
-    if user_data.user_group_ids:
+    group_ids = list(user_data.user_group_ids) if user_data.user_group_ids else []
+    if not group_ids and not new_user.is_superuser:
+        default_group = await db.execute(
+            select(UserGroup).where(UserGroup.name == 'default')
+        )
+        default_group = default_group.scalar_one_or_none()
+        if default_group:
+            group_ids = [default_group.id]
+    if group_ids:
         await db.execute(
             user_group_members.insert(),
-            [{"user_group_id": gid, "user_id": new_user.id} for gid in user_data.user_group_ids]
+            [{"user_group_id": gid, "user_id": new_user.id} for gid in group_ids]
         )
 
     await db.commit()

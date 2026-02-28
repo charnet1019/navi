@@ -100,8 +100,6 @@ const treeData = computed(() => buildTree(navigationStore.groups))
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
   { title: '描述', dataIndex: 'description', key: 'description' },
-  { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 80 },
-  { title: '状态', key: 'is_active', width: 100 },
   { title: '操作', key: 'actions', width: 220 }
 ]
 
