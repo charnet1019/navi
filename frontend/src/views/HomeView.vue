@@ -1,7 +1,8 @@
 <template>
   <AppLayout>
     <div class="home-view">
-      <div v-if="selectedGroup" class="group-content">
+      <a-spin v-if="!navigationStore.fetched" style="display:flex;justify-content:center;padding-top:80px" />
+      <div v-else-if="selectedGroup" class="group-content">
         <div class="group-toolbar">
           <a-button
             v-if="authStore.isSuperuser"

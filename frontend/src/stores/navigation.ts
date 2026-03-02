@@ -25,7 +25,7 @@ function buildTree(flat: NavigationGroup[]): NavigationGroup[] {
 
 export const useNavigationStore = defineStore('navigation', () => {
   const groups = ref<NavigationGroup[]>([])
-  const selectedGroupId = ref<string | null>(null)
+  const selectedGroupId = ref<string | null>(localStorage.getItem('nav_selected_group'))
   const loading = ref(false)
   const fetched = ref(false)
   const error = ref<string | null>(null)
@@ -97,6 +97,7 @@ export const useNavigationStore = defineStore('navigation', () => {
       groups.value = groups.value.filter(g => g.id !== id)
       if (selectedGroupId.value === id) {
         selectedGroupId.value = null
+        localStorage.removeItem('nav_selected_group')
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete group'
@@ -109,6 +110,11 @@ export const useNavigationStore = defineStore('navigation', () => {
 
   function selectGroup(id: string | null): void {
     selectedGroupId.value = id
+    if (id) {
+      localStorage.setItem('nav_selected_group', id)
+    } else {
+      localStorage.removeItem('nav_selected_group')
+    }
   }
 
   async function reorderGroups(orderedIds: string[]): Promise<void> {
