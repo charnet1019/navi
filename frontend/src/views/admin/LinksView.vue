@@ -87,7 +87,7 @@ const pageSize = ref(10)
 onMounted(async () => {
   try {
     await Promise.all([
-      linksStore.fetchLinks(),
+      handleFilterChange(),
       navigationStore.fetchGroups()
     ])
   } catch (error) {
