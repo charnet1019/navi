@@ -53,5 +53,9 @@ export const usersApi = {
   async getAuthorizedAssets(id: string): Promise<AuthorizedAssets> {
     const response = await apiClient.get<AuthorizedAssets>(`/users/${id}/authorized-assets`)
     return response.data
+  },
+
+  async unlock(id: string): Promise<void> {
+    await apiClient.post(`/users/${id}/unlock`)
   }
 }

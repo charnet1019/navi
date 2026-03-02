@@ -20,7 +20,11 @@ from app.core.permissions import get_user_permissions, invalidate_user_permissio
 from app.models.associations import NavigationGroupPermission, LinkPermission, user_group_members
 from app.models.navigation_group import NavigationGroup
 from app.models.link import Link
+from app.models.system_setting import SystemSetting
 from app.config import settings
+from app.redis import get_redis
+
+LOGIN_ATTEMPT_PREFIX = "login_attempts:"
 
 
 class ResetPasswordRequest(BaseModel):
@@ -47,7 +51,7 @@ async def list_users(
         limit: Maximum number of records to return
 
     Returns:
-        List of users
+        List of users with lock status
     """
     stmt = (
         select(User)
@@ -59,7 +63,35 @@ async def list_users(
     result = await db.execute(stmt)
     users = result.scalars().all()
 
-    return [UserResponse.model_validate(user) for user in users]
+    # Get login settings for max_attempts check
+    keys = ["max_login_attempts"]
+    settings_stmt = select(SystemSetting).where(SystemSetting.key.in_(keys))
+    settings_result = await db.execute(settings_stmt)
+    rows = {s.key: s.value for s in settings_result.scalars().all()}
+    max_attempts = int(rows.get("max_login_attempts", 3))
+
+    # Check lock status for each user
+    redis = await get_redis()
+    user_responses = []
+    for user in users:
+        user_dict = UserResponse.model_validate(user).model_dump()
+
+        # Check if user is locked
+        attempt_key = f"{LOGIN_ATTEMPT_PREFIX}{user.username}"
+        attempts = await redis.get(attempt_key)
+
+        if attempts is not None and int(attempts) >= max_attempts:
+            user_dict["is_locked"] = True
+            ttl = await redis.ttl(attempt_key)
+            if ttl > 0:
+                from datetime import datetime, timedelta, timezone
+                user_dict["locked_until"] = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+        else:
+            user_dict["is_locked"] = False
+
+        user_responses.append(UserResponse(**user_dict))
+
+    return user_responses
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -360,9 +392,11 @@ async def disable_user(
 
     user.is_active = False
     await db.commit()
-    await db.refresh(user)
 
-    return UserResponse.model_validate(user)
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.user_groups))
+    )
+    return UserResponse.model_validate(result.scalar_one())
 
 
 @router.post("/{user_id}/enable", response_model=UserResponse)
@@ -384,9 +418,11 @@ async def enable_user(
 
     user.is_active = True
     await db.commit()
-    await db.refresh(user)
 
-    return UserResponse.model_validate(user)
+    result = await db.execute(
+        select(User).where(User.id == user_id).options(selectinload(User.user_groups))
+    )
+    return UserResponse.model_validate(result.scalar_one())
 
 
 @router.get("/{user_id}/permissions")
@@ -498,3 +534,23 @@ async def get_user_authorized_assets(
         "nav_group_permissions": nav_group_permissions,
         "link_permissions": link_permissions,
     }
+
+
+@router.post("/{user_id}/unlock")
+async def unlock_user(
+    user_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_superuser)],
+) -> dict:
+    """Clear login lockout for a user (admin only)."""
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    redis = await get_redis()
+    await redis.delete(f"{LOGIN_ATTEMPT_PREFIX}{user.username}")
+
+    return {"message": "User unlocked successfully"}

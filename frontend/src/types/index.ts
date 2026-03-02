@@ -16,6 +16,8 @@ export interface User {
   last_login: string | null
   roles?: Role[]
   user_groups?: UserGroupBrief[]
+  is_locked?: boolean
+  locked_until?: string
 }
 
 export interface Role {

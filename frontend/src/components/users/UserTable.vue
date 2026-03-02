@@ -10,7 +10,10 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'is_active'">
-          <a-tag :color="record.is_active ? 'green' : 'red'">
+          <a-tag v-if="record.is_locked" color="orange">
+            已锁定
+          </a-tag>
+          <a-tag v-else :color="record.is_active ? 'green' : 'red'">
             {{ record.is_active ? '已激活' : '未激活' }}
           </a-tag>
         </template>
@@ -41,6 +44,7 @@
                 <a-menu>
                   <a-menu-item @click="handleViewAssets(record)">已授权资产</a-menu-item>
                   <a-menu-item @click="handleResetPassword(record)">重置密码</a-menu-item>
+                  <a-menu-item @click="handleUnlock(record)">解锁</a-menu-item>
                   <a-menu-item v-if="record.is_active" danger @click="handleDisable(record)">禁用</a-menu-item>
                   <a-menu-item v-else @click="handleEnable(record)">启用</a-menu-item>
                   <a-menu-item danger @click="handleDelete(record)">删除</a-menu-item>
@@ -74,6 +78,7 @@ interface Emits {
   (e: 'disable', user: User): void
   (e: 'enable', user: User): void
   (e: 'viewAssets', user: User): void
+  (e: 'unlock', user: User): void
   (e: 'pageChange', page: number, pageSize: number): void
 }
 
@@ -161,6 +166,10 @@ const handleEnable = (user: User) => {
 
 const handleViewAssets = (user: User) => {
   emit('viewAssets', user)
+}
+
+const handleUnlock = (user: User) => {
+  emit('unlock', user)
 }
 
 const handleTableChange: TableProps['onChange'] = (pagination) => {

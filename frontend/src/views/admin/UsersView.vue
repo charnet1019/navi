@@ -17,6 +17,7 @@
         @disable="handleDisable"
         @enable="handleEnable"
         @view-assets="handleViewAssets"
+        @unlock="handleUnlock"
       />
 
       <UserModal
@@ -251,6 +252,22 @@ const handleRevokeLink = async (asset: LinkAsset) => {
   } catch (error) {
     message.error('撤销权限失败')
   }
+}
+
+const handleUnlock = (user: User) => {
+  Modal.confirm({
+    title: '解锁用户',
+    content: `确定要解锁用户"${user.username}"吗？这将清除登录失败次数限制。`,
+    okText: '解锁',
+    onOk: async () => {
+      try {
+        await usersApi.unlock(user.id)
+        message.success('用户已解锁')
+      } catch (error) {
+        message.error('解锁用户失败')
+      }
+    }
+  })
 }
 </script>
 

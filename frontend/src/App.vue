@@ -3,7 +3,21 @@
 </template>
 
 <script setup lang="ts">
-// Root component
+import { watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useIdleTimeout } from '@/composables/useIdleTimeout'
+
+const authStore = useAuthStore()
+const { setupListeners, cleanupListeners } = useIdleTimeout()
+
+// Watch auth state to setup/cleanup idle timeout
+watch(() => authStore.isAuthenticated, (isAuth) => {
+  if (isAuth) {
+    setupListeners()
+  } else {
+    cleanupListeners()
+  }
+}, { immediate: true })
 </script>
 
 <style>

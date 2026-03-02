@@ -46,5 +46,7 @@ class UserResponse(BaseModel):
     updated_at: datetime
     last_login: Optional[datetime]
     user_groups: list[UserGroupBrief] = []
+    is_locked: Optional[bool] = None
+    locked_until: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
