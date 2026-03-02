@@ -78,9 +78,9 @@ const selectedGroup = computed(() => navigationStore.selectedGroup)
 
 const filteredLinks = computed(() => {
   if (!selectedGroup.value) return []
-  return linksStore.links.filter(link =>
-    link.navigation_group_id === selectedGroup.value?.id && link.is_active
-  )
+  return linksStore.links
+    .filter(link => link.navigation_group_id === selectedGroup.value?.id && link.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order)
 })
 
 onMounted(async () => {

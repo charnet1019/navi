@@ -14,7 +14,13 @@ function buildTree(flat: NavigationGroup[]): NavigationGroup[] {
       roots.push(g)
     }
   })
-  return roots.sort((a, b) => a.sort_order - b.sort_order)
+  function sortTree(nodes: NavigationGroup[]): NavigationGroup[] {
+    return [...nodes].sort((a, b) => a.sort_order - b.sort_order).map(n => ({
+      ...n,
+      children: n.children?.length ? sortTree(n.children) : n.children
+    }))
+  }
+  return sortTree(roots)
 }
 
 export const useNavigationStore = defineStore('navigation', () => {

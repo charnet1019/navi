@@ -39,6 +39,7 @@ async def list_navigation_groups(
 ) -> List[NavigationGroupResponse]:
     """
     List navigation groups (filtered by user permissions).
+    Includes parent groups to maintain hierarchy.
 
     Args:
         db: Database session
@@ -47,7 +48,7 @@ async def list_navigation_groups(
         limit: Maximum number of records to return
 
     Returns:
-        List of navigation groups the user has access to
+        List of navigation groups the user has access to (including parent groups)
     """
     if current_user.is_superuser:
         stmt = select(NavigationGroup).where(
@@ -55,58 +56,98 @@ async def list_navigation_groups(
         ).offset(skip).limit(limit).order_by(
             NavigationGroup.sort_order, NavigationGroup.name
         )
-    else:
-        user_group_ids = [ug.id for ug in current_user.user_groups]
-        user_filter = [NavigationGroupPermission.user_id == current_user.id]
-        if user_group_ids:
-            user_filter.append(NavigationGroupPermission.user_group_id.in_(user_group_ids))
+        result = await db.execute(stmt)
+        groups = result.scalars().all()
+        return [NavigationGroupResponse.model_validate(group) for group in groups]
 
-        # Check for "all" permission (navigation_group_id IS NULL)
-        all_perm_stmt = select(NavigationGroupPermission).where(
-            NavigationGroupPermission.navigation_group_id.is_(None),
-            or_(*user_filter),
+    user_group_ids = [ug.id for ug in current_user.user_groups]
+    user_filter = [NavigationGroupPermission.user_id == current_user.id]
+    if user_group_ids:
+        user_filter.append(NavigationGroupPermission.user_group_id.in_(user_group_ids))
+
+    # Check for "all" permission (navigation_group_id IS NULL)
+    all_perm_stmt = select(NavigationGroupPermission).where(
+        NavigationGroupPermission.navigation_group_id.is_(None),
+        or_(*user_filter),
+    )
+    all_perm = await db.execute(all_perm_stmt)
+    has_all_access = all_perm.scalar_one_or_none() is not None
+
+    if has_all_access:
+        stmt = select(NavigationGroup).where(
+            NavigationGroup.is_active == True
+        ).offset(skip).limit(limit).order_by(
+            NavigationGroup.sort_order, NavigationGroup.name
         )
-        all_perm = await db.execute(all_perm_stmt)
-        has_all_access = all_perm.scalar_one_or_none() is not None
+        result = await db.execute(stmt)
+        groups = result.scalars().all()
+        return [NavigationGroupResponse.model_validate(group) for group in groups]
 
-        if has_all_access:
-            stmt = select(NavigationGroup).where(
-                NavigationGroup.is_active == True
-            ).offset(skip).limit(limit).order_by(
-                NavigationGroup.sort_order, NavigationGroup.name
-            )
-        else:
-            permitted_ids_stmt = select(
-                NavigationGroupPermission.navigation_group_id
-            ).where(
-                NavigationGroupPermission.navigation_group_id.isnot(None),
-                or_(*user_filter),
-            )
+    # Get directly permitted group IDs
+    permitted_ids_stmt = select(
+        NavigationGroupPermission.navigation_group_id
+    ).where(
+        NavigationGroupPermission.navigation_group_id.isnot(None),
+        or_(*user_filter),
+    )
+    permitted_result = await db.execute(permitted_ids_stmt)
+    permitted_ids = set(permitted_result.scalars().all())
 
-            # Groups containing links directly permitted to the user
-            link_filter = [LinkPermission.user_id == current_user.id]
-            if user_group_ids:
-                link_filter.append(LinkPermission.user_group_id.in_(user_group_ids))
-            direct_group_ids_stmt = (
-                select(Link.navigation_group_id)
-                .join(LinkPermission, LinkPermission.link_id == Link.id)
-                .where(or_(*link_filter))
-                .distinct()
-            )
+    # Groups containing links directly permitted to the user
+    link_filter = [LinkPermission.user_id == current_user.id]
+    if user_group_ids:
+        link_filter.append(LinkPermission.user_group_id.in_(user_group_ids))
+    direct_group_ids_stmt = (
+        select(Link.navigation_group_id)
+        .join(LinkPermission, LinkPermission.link_id == Link.id)
+        .where(or_(*link_filter))
+        .distinct()
+    )
+    direct_group_result = await db.execute(direct_group_ids_stmt)
+    permitted_ids.update(direct_group_result.scalars().all())
 
-            stmt = select(NavigationGroup).where(
-                NavigationGroup.is_active == True,
-                or_(
-                    NavigationGroup.id.in_(permitted_ids_stmt),
-                    NavigationGroup.id.in_(direct_group_ids_stmt),
-                ),
-            ).offset(skip).limit(limit).order_by(
-                NavigationGroup.sort_order, NavigationGroup.name
-            )
+    if not permitted_ids:
+        return []
 
-    result = await db.execute(stmt)
-    groups = result.scalars().all()
-    return [NavigationGroupResponse.model_validate(group) for group in groups]
+    # Fetch all active groups to find ancestors
+    all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+    all_groups_result = await db.execute(all_groups_stmt)
+    all_groups = {g.id: g for g in all_groups_result.scalars().all()}
+
+    # Find all ancestors of permitted groups
+    def find_ancestors(group_id, groups_map):
+        """Recursively find all ancestor group IDs."""
+        ancestors = set()
+        current = groups_map.get(group_id)
+        while current and current.parent_id:
+            ancestors.add(current.parent_id)
+            current = groups_map.get(current.parent_id)
+        return ancestors
+
+    # Find all descendants of permitted groups
+    def find_descendants(group_id, groups_map):
+        """Recursively find all descendant group IDs."""
+        descendants = set()
+        for gid, group in groups_map.items():
+            if group.parent_id == group_id:
+                descendants.add(gid)
+                descendants.update(find_descendants(gid, groups_map))
+        return descendants
+
+    # Collect all group IDs to return (permitted + ancestors + descendants)
+    result_ids = set(permitted_ids)
+    for group_id in permitted_ids:
+        result_ids.update(find_ancestors(group_id, all_groups))
+        result_ids.update(find_descendants(group_id, all_groups))
+
+    # Filter and return groups
+    result_groups = [all_groups[gid] for gid in result_ids if gid in all_groups]
+    result_groups.sort(key=lambda g: (g.sort_order, g.name))
+
+    # Apply pagination
+    paginated_groups = result_groups[skip:skip + limit] if limit else result_groups[skip:]
+
+    return [NavigationGroupResponse.model_validate(group) for group in paginated_groups]
 
 
 @router.post("/", response_model=NavigationGroupResponse, status_code=status.HTTP_201_CREATED)

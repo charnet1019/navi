@@ -71,12 +71,40 @@ async def list_links(
                 Link.sort_order, Link.name
             )
         else:
+            # Get directly permitted group IDs
             permitted_group_ids_stmt = select(
                 NavigationGroupPermission.navigation_group_id
             ).where(
                 NavigationGroupPermission.navigation_group_id.isnot(None),
                 or_(*nav_filter),
             )
+            permitted_result = await db.execute(permitted_group_ids_stmt)
+            permitted_group_ids = set(permitted_result.scalars().all())
+
+            # If user has group permissions, expand to include descendants
+            if permitted_group_ids:
+                # Fetch all active navigation groups
+                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+                all_groups_result = await db.execute(all_groups_stmt)
+                all_groups = {g.id: g for g in all_groups_result.scalars().all()}
+
+                # Find all descendants of permitted groups
+                def find_descendants(group_id, groups_map):
+                    """Recursively find all descendant group IDs."""
+                    descendants = set()
+                    for gid, group in groups_map.items():
+                        if group.parent_id == group_id:
+                            descendants.add(gid)
+                            descendants.update(find_descendants(gid, groups_map))
+                    return descendants
+
+                # Expand permitted groups to include descendants
+                expanded_group_ids = set(permitted_group_ids)
+                for group_id in permitted_group_ids:
+                    expanded_group_ids.update(find_descendants(group_id, all_groups))
+
+                permitted_group_ids = expanded_group_ids
+
             direct_link_ids_stmt = select(
                 LinkPermission.link_id
             ).where(or_(*link_filter))
@@ -84,7 +112,7 @@ async def list_links(
             stmt = select(Link).where(
                 Link.is_active == True,
                 or_(
-                    Link.navigation_group_id.in_(permitted_group_ids_stmt),
+                    Link.navigation_group_id.in_(permitted_group_ids) if permitted_group_ids else False,
                     Link.id.in_(direct_link_ids_stmt),
                 ),
             ).offset(skip).limit(limit).order_by(
@@ -226,13 +254,39 @@ async def get_link(
         has_all_access = all_perm.scalar_one_or_none() is not None
 
         if not has_all_access:
-            # Check nav-group level permission
-            nav_perm_stmt = select(NavigationGroupPermission).where(
-                NavigationGroupPermission.navigation_group_id == link.navigation_group_id,
+            # Get all permitted group IDs
+            permitted_ids_stmt = select(
+                NavigationGroupPermission.navigation_group_id
+            ).where(
+                NavigationGroupPermission.navigation_group_id.isnot(None),
                 or_(*nav_filter),
             )
-            nav_perm = await db.execute(nav_perm_stmt)
-            has_group_access = nav_perm.scalar_one_or_none() is not None
+            permitted_result = await db.execute(permitted_ids_stmt)
+            permitted_group_ids = set(permitted_result.scalars().all())
+
+            # Check if user has direct permission to link's group
+            has_group_access = link.navigation_group_id in permitted_group_ids
+
+            # If not, check if user has permission to any ancestor
+            if not has_group_access and permitted_group_ids:
+                # Fetch all groups to find ancestors
+                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+                all_groups_result = await db.execute(all_groups_stmt)
+                all_groups = {g.id: g for g in all_groups_result.scalars().all()}
+
+                # Find ancestors of the link's group
+                def find_ancestors(gid, groups_map):
+                    """Recursively find all ancestor group IDs."""
+                    ancestors = set()
+                    current = groups_map.get(gid)
+                    while current and current.parent_id:
+                        ancestors.add(current.parent_id)
+                        current = groups_map.get(current.parent_id)
+                    return ancestors
+
+                ancestor_ids = find_ancestors(link.navigation_group_id, all_groups)
+                # User has access if they have permission to any ancestor
+                has_group_access = bool(permitted_group_ids & ancestor_ids)
 
             if not has_group_access:
                 # Check direct link permission
@@ -586,16 +640,50 @@ async def get_links_by_navigation_group(
             nav_filter.append(NavigationGroupPermission.user_group_id.in_(user_group_ids))
             link_filter.append(LinkPermission.user_group_id.in_(user_group_ids))
 
-        # Check if user has group-level or "all" permission
-        perm_stmt = select(NavigationGroupPermission).where(
-            or_(
-                NavigationGroupPermission.navigation_group_id.is_(None),
-                NavigationGroupPermission.navigation_group_id == group_id,
-            ),
+        # Check if user has "all" permission
+        all_perm_stmt = select(NavigationGroupPermission).where(
+            NavigationGroupPermission.navigation_group_id.is_(None),
             or_(*nav_filter),
         )
-        perm_result = await db.execute(perm_stmt)
-        has_group_access = perm_result.scalar_one_or_none() is not None
+        all_perm_result = await db.execute(all_perm_stmt)
+        has_all_access = all_perm_result.scalar_one_or_none() is not None
+
+        if has_all_access:
+            has_group_access = True
+        else:
+            # Get all permitted group IDs
+            permitted_ids_stmt = select(
+                NavigationGroupPermission.navigation_group_id
+            ).where(
+                NavigationGroupPermission.navigation_group_id.isnot(None),
+                or_(*nav_filter),
+            )
+            permitted_result = await db.execute(permitted_ids_stmt)
+            permitted_group_ids = set(permitted_result.scalars().all())
+
+            # Check if user has direct permission to this group
+            has_group_access = group_id in permitted_group_ids
+
+            # If not, check if user has permission to any ancestor
+            if not has_group_access and permitted_group_ids:
+                # Fetch the requested group and its ancestors
+                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+                all_groups_result = await db.execute(all_groups_stmt)
+                all_groups = {g.id: g for g in all_groups_result.scalars().all()}
+
+                # Find ancestors of the requested group
+                def find_ancestors(gid, groups_map):
+                    """Recursively find all ancestor group IDs."""
+                    ancestors = set()
+                    current = groups_map.get(gid)
+                    while current and current.parent_id:
+                        ancestors.add(current.parent_id)
+                        current = groups_map.get(current.parent_id)
+                    return ancestors
+
+                ancestor_ids = find_ancestors(group_id, all_groups)
+                # User has access if they have permission to any ancestor
+                has_group_access = bool(permitted_group_ids & ancestor_ids)
 
         if has_group_access:
             stmt = select(Link).where(

@@ -373,6 +373,22 @@ async def get_user_group_authorized_assets(
             detail="User group not found",
         )
 
+    # Fetch all navigation groups to build hierarchy paths
+    all_groups_stmt = select(NavigationGroup)
+    all_groups_result = await db.execute(all_groups_stmt)
+    all_groups = {g.id: g for g in all_groups_result.scalars().all()}
+
+    def build_group_path(group_id, groups_map):
+        """Build full hierarchy path for a navigation group."""
+        if group_id is None:
+            return "全部"
+        path_parts = []
+        current = groups_map.get(group_id)
+        while current:
+            path_parts.insert(0, current.name)
+            current = groups_map.get(current.parent_id) if current.parent_id else None
+        return "/".join(path_parts) if path_parts else ""
+
     # Nav group permissions assigned to this user group
     nav_stmt = (
         select(
@@ -397,7 +413,7 @@ async def get_user_group_authorized_assets(
                 if row.NavigationGroupPermission.navigation_group_id
                 else None
             ),
-            "navigation_group_name": row.group_name if row.group_name else "全部",
+            "navigation_group_name": build_group_path(row.NavigationGroupPermission.navigation_group_id, all_groups),
             "granted_at": row.NavigationGroupPermission.granted_at.isoformat(),
         }
         for row in nav_rows
@@ -408,10 +424,9 @@ async def get_user_group_authorized_assets(
         select(
             LinkPermission,
             Link.name.label("link_name"),
-            NavigationGroup.name.label("group_name"),
+            Link.navigation_group_id.label("group_id"),
         )
         .join(Link, LinkPermission.link_id == Link.id)
-        .outerjoin(NavigationGroup, Link.navigation_group_id == NavigationGroup.id)
         .where(LinkPermission.user_group_id == group_id)
         .order_by(LinkPermission.granted_at.desc())
     )
@@ -423,7 +438,7 @@ async def get_user_group_authorized_assets(
             "permission_id": str(row.LinkPermission.id),
             "link_id": str(row.LinkPermission.link_id),
             "link_name": row.link_name,
-            "navigation_group_name": row.group_name,
+            "navigation_group_name": build_group_path(row.group_id, all_groups),
             "granted_at": row.LinkPermission.granted_at.isoformat(),
         }
         for row in link_rows
