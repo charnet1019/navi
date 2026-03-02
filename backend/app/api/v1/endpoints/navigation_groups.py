@@ -35,7 +35,7 @@ async def list_navigation_groups(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(settings.DEFAULT_PAGE_SIZE, ge=1, le=settings.MAX_PAGE_SIZE),
+    limit: int = Query(1000, ge=1, le=10000),
 ) -> List[NavigationGroupResponse]:
     """
     List navigation groups (filtered by user permissions).
@@ -45,7 +45,7 @@ async def list_navigation_groups(
         db: Database session
         current_user: Current active user
         skip: Number of records to skip
-        limit: Maximum number of records to return
+        limit: Maximum number of records to return (default 1000 for complete tree)
 
     Returns:
         List of navigation groups the user has access to (including parent groups)
@@ -53,7 +53,7 @@ async def list_navigation_groups(
     if current_user.is_superuser:
         stmt = select(NavigationGroup).where(
             NavigationGroup.is_active == True
-        ).offset(skip).limit(limit).order_by(
+        ).order_by(
             NavigationGroup.sort_order, NavigationGroup.name
         )
         result = await db.execute(stmt)
@@ -76,7 +76,7 @@ async def list_navigation_groups(
     if has_all_access:
         stmt = select(NavigationGroup).where(
             NavigationGroup.is_active == True
-        ).offset(skip).limit(limit).order_by(
+        ).order_by(
             NavigationGroup.sort_order, NavigationGroup.name
         )
         result = await db.execute(stmt)
@@ -159,14 +159,11 @@ async def list_navigation_groups(
             result_ids.update(find_ancestors(group_id, all_groups))
             result_ids.update(find_descendants(group_id, all_groups))
 
-    # Filter and return groups
+    # Filter and return groups (no pagination for tree structure integrity)
     result_groups = [all_groups[gid] for gid in result_ids if gid in all_groups]
     result_groups.sort(key=lambda g: (g.sort_order, g.name))
 
-    # Apply pagination
-    paginated_groups = result_groups[skip:skip + limit] if limit else result_groups[skip:]
-
-    return [NavigationGroupResponse.model_validate(group) for group in paginated_groups]
+    return [NavigationGroupResponse.model_validate(group) for group in result_groups]
 
 
 @router.post("/", response_model=NavigationGroupResponse, status_code=status.HTTP_201_CREATED)
