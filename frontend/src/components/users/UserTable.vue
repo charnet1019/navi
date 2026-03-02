@@ -34,52 +34,19 @@
 
         <template v-else-if="column.key === 'actions'">
           <a-space>
-            <a-button
-              type="link"
-              size="small"
-              @click="handleEdit(record)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              type="link"
-              size="small"
-              @click="handleViewAssets(record)"
-            >
-              已授权资产
-            </a-button>
-            <a-button
-              type="link"
-              size="small"
-              @click="handleResetPassword(record)"
-            >
-              重置密码
-            </a-button>
-            <a-button
-              v-if="record.is_active"
-              type="link"
-              size="small"
-              danger
-              @click="handleDisable(record)"
-            >
-              禁用
-            </a-button>
-            <a-button
-              v-else
-              type="link"
-              size="small"
-              @click="handleEnable(record)"
-            >
-              启用
-            </a-button>
-            <a-button
-              type="link"
-              size="small"
-              danger
-              @click="handleDelete(record)"
-            >
-              删除
-            </a-button>
+            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+            <a-dropdown>
+              <a-button type="link" size="small">更多</a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="handleViewAssets(record)">已授权资产</a-menu-item>
+                  <a-menu-item @click="handleResetPassword(record)">重置密码</a-menu-item>
+                  <a-menu-item v-if="record.is_active" danger @click="handleDisable(record)">禁用</a-menu-item>
+                  <a-menu-item v-else @click="handleEnable(record)">启用</a-menu-item>
+                  <a-menu-item danger @click="handleDelete(record)">删除</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </a-space>
         </template>
       </template>
@@ -158,7 +125,7 @@ const columns: TableColumnType<User>[] = [
   {
     title: '操作',
     key: 'actions',
-    width: 420
+    width: 120
   }
 ]
 
