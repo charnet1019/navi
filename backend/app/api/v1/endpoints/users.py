@@ -478,20 +478,32 @@ async def get_user_authorized_assets(
             detail="User not found",
         )
 
-    # Fetch all navigation groups to build hierarchy paths
-    all_groups_stmt = select(NavigationGroup)
+    # Fetch all navigation groups to build hierarchy paths with limit
+    all_groups_stmt = select(NavigationGroup).limit(settings.MAX_NAVIGATION_GROUPS)
     all_groups_result = await db.execute(all_groups_stmt)
     all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
-    def build_group_path(group_id, groups_map):
-        """Build full hierarchy path for a navigation group."""
+    def build_group_path(group_id, groups_map, max_depth=None):
+        """Build full hierarchy path for a navigation group with depth limit and cycle detection."""
         if group_id is None:
             return "全部"
+        if max_depth is None:
+            max_depth = settings.MAX_HIERARCHY_DEPTH
+
         path_parts = []
         current = groups_map.get(group_id)
-        while current:
+        visited = set()
+        depth = 0
+
+        while current and depth < max_depth:
+            if current.id in visited:
+                # Cycle detected, break to prevent infinite loop
+                break
+            visited.add(current.id)
             path_parts.insert(0, current.name)
             current = groups_map.get(current.parent_id) if current.parent_id else None
+            depth += 1
+
         return "/".join(path_parts) if path_parts else ""
 
     # Nav group permissions directly assigned to this user

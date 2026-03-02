@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Security - Hierarchy limits
+    MAX_HIERARCHY_DEPTH: int = 50
+    MAX_NAVIGATION_GROUPS: int = 10000
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -109,36 +109,55 @@ async def list_navigation_groups(
     if not permitted_ids:
         return []
 
-    # Fetch all active groups to find ancestors
-    all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+    # Fetch all active groups to find ancestors with limit
+    all_groups_stmt = select(NavigationGroup).where(
+        NavigationGroup.is_active == True
+    ).limit(settings.MAX_NAVIGATION_GROUPS)
     all_groups_result = await db.execute(all_groups_stmt)
     all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
     # Find all ancestors of permitted groups
-    def find_ancestors(group_id, groups_map):
-        """Recursively find all ancestor group IDs."""
+    def find_ancestors(group_id, groups_map, max_depth=None, current_depth=0, visited=None):
+        """Recursively find all ancestor group IDs with depth limit and cycle detection."""
+        if max_depth is None:
+            max_depth = settings.MAX_HIERARCHY_DEPTH
+        if visited is None:
+            visited = set()
+        if not group_id or current_depth >= max_depth or group_id in visited or group_id not in groups_map:
+            return set()
+        visited.add(group_id)
+
         ancestors = set()
         current = groups_map.get(group_id)
-        while current and current.parent_id:
+        if current and current.parent_id:
             ancestors.add(current.parent_id)
-            current = groups_map.get(current.parent_id)
+            ancestors.update(find_ancestors(current.parent_id, groups_map, max_depth, current_depth + 1, visited))
         return ancestors
 
     # Find all descendants of permitted groups
-    def find_descendants(group_id, groups_map):
-        """Recursively find all descendant group IDs."""
+    def find_descendants(group_id, groups_map, max_depth=None, current_depth=0, visited=None):
+        """Recursively find all descendant group IDs with depth limit and cycle detection."""
+        if max_depth is None:
+            max_depth = settings.MAX_HIERARCHY_DEPTH
+        if visited is None:
+            visited = set()
+        if not group_id or current_depth >= max_depth or group_id in visited:
+            return set()
+        visited.add(group_id)
+
         descendants = set()
         for gid, group in groups_map.items():
             if group.parent_id == group_id:
                 descendants.add(gid)
-                descendants.update(find_descendants(gid, groups_map))
+                descendants.update(find_descendants(gid, groups_map, max_depth, current_depth + 1, visited))
         return descendants
 
     # Collect all group IDs to return (permitted + ancestors + descendants)
     result_ids = set(permitted_ids)
     for group_id in permitted_ids:
-        result_ids.update(find_ancestors(group_id, all_groups))
-        result_ids.update(find_descendants(group_id, all_groups))
+        if group_id:  # Input validation
+            result_ids.update(find_ancestors(group_id, all_groups))
+            result_ids.update(find_descendants(group_id, all_groups))
 
     # Filter and return groups
     result_groups = [all_groups[gid] for gid in result_ids if gid in all_groups]

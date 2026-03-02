@@ -83,25 +83,36 @@ async def list_links(
 
             # If user has group permissions, expand to include descendants
             if permitted_group_ids:
-                # Fetch all active navigation groups
-                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+                # Fetch all active navigation groups with limit
+                all_groups_stmt = select(NavigationGroup).where(
+                    NavigationGroup.is_active == True
+                ).limit(settings.MAX_NAVIGATION_GROUPS)
                 all_groups_result = await db.execute(all_groups_stmt)
                 all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
                 # Find all descendants of permitted groups
-                def find_descendants(group_id, groups_map):
-                    """Recursively find all descendant group IDs."""
+                def find_descendants(group_id, groups_map, max_depth=None, current_depth=0, visited=None):
+                    """Recursively find all descendant group IDs with depth limit and cycle detection."""
+                    if max_depth is None:
+                        max_depth = settings.MAX_HIERARCHY_DEPTH
+                    if visited is None:
+                        visited = set()
+                    if not group_id or current_depth >= max_depth or group_id in visited:
+                        return set()
+                    visited.add(group_id)
+
                     descendants = set()
                     for gid, group in groups_map.items():
                         if group.parent_id == group_id:
                             descendants.add(gid)
-                            descendants.update(find_descendants(gid, groups_map))
+                            descendants.update(find_descendants(gid, groups_map, max_depth, current_depth + 1, visited))
                     return descendants
 
                 # Expand permitted groups to include descendants
                 expanded_group_ids = set(permitted_group_ids)
                 for group_id in permitted_group_ids:
-                    expanded_group_ids.update(find_descendants(group_id, all_groups))
+                    if group_id:  # Input validation
+                        expanded_group_ids.update(find_descendants(group_id, all_groups))
 
                 permitted_group_ids = expanded_group_ids
 
@@ -268,20 +279,30 @@ async def get_link(
             has_group_access = link.navigation_group_id in permitted_group_ids
 
             # If not, check if user has permission to any ancestor
-            if not has_group_access and permitted_group_ids:
-                # Fetch all groups to find ancestors
-                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+            if not has_group_access and permitted_group_ids and link.navigation_group_id:
+                # Fetch all groups to find ancestors with limit
+                all_groups_stmt = select(NavigationGroup).where(
+                    NavigationGroup.is_active == True
+                ).limit(settings.MAX_NAVIGATION_GROUPS)
                 all_groups_result = await db.execute(all_groups_stmt)
                 all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
                 # Find ancestors of the link's group
-                def find_ancestors(gid, groups_map):
-                    """Recursively find all ancestor group IDs."""
+                def find_ancestors(gid, groups_map, max_depth=None, current_depth=0, visited=None):
+                    """Recursively find all ancestor group IDs with depth limit and cycle detection."""
+                    if max_depth is None:
+                        max_depth = settings.MAX_HIERARCHY_DEPTH
+                    if visited is None:
+                        visited = set()
+                    if not gid or current_depth >= max_depth or gid in visited or gid not in groups_map:
+                        return set()
+                    visited.add(gid)
+
                     ancestors = set()
                     current = groups_map.get(gid)
-                    while current and current.parent_id:
+                    if current and current.parent_id:
                         ancestors.add(current.parent_id)
-                        current = groups_map.get(current.parent_id)
+                        ancestors.update(find_ancestors(current.parent_id, groups_map, max_depth, current_depth + 1, visited))
                     return ancestors
 
                 ancestor_ids = find_ancestors(link.navigation_group_id, all_groups)
@@ -665,20 +686,30 @@ async def get_links_by_navigation_group(
             has_group_access = group_id in permitted_group_ids
 
             # If not, check if user has permission to any ancestor
-            if not has_group_access and permitted_group_ids:
-                # Fetch the requested group and its ancestors
-                all_groups_stmt = select(NavigationGroup).where(NavigationGroup.is_active == True)
+            if not has_group_access and permitted_group_ids and group_id:
+                # Fetch the requested group and its ancestors with limit
+                all_groups_stmt = select(NavigationGroup).where(
+                    NavigationGroup.is_active == True
+                ).limit(settings.MAX_NAVIGATION_GROUPS)
                 all_groups_result = await db.execute(all_groups_stmt)
                 all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
                 # Find ancestors of the requested group
-                def find_ancestors(gid, groups_map):
-                    """Recursively find all ancestor group IDs."""
+                def find_ancestors(gid, groups_map, max_depth=None, current_depth=0, visited=None):
+                    """Recursively find all ancestor group IDs with depth limit and cycle detection."""
+                    if max_depth is None:
+                        max_depth = settings.MAX_HIERARCHY_DEPTH
+                    if visited is None:
+                        visited = set()
+                    if not gid or current_depth >= max_depth or gid in visited or gid not in groups_map:
+                        return set()
+                    visited.add(gid)
+
                     ancestors = set()
                     current = groups_map.get(gid)
-                    while current and current.parent_id:
+                    if current and current.parent_id:
                         ancestors.add(current.parent_id)
-                        current = groups_map.get(current.parent_id)
+                        ancestors.update(find_ancestors(current.parent_id, groups_map, max_depth, current_depth + 1, visited))
                     return ancestors
 
                 ancestor_ids = find_ancestors(group_id, all_groups)
