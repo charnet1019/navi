@@ -87,7 +87,9 @@ const filteredLinks = computed(() => {
 onMounted(async () => {
   try {
     await Promise.all([
-      linksStore.fetchLinks({ is_active: true }),
+      navigationStore.selectedGroupId
+        ? linksStore.fetchLinks({ navigation_group_id: navigationStore.selectedGroupId, is_active: true })
+        : linksStore.fetchLinks({ is_active: true }),
       settingsStore.fetchPublicSettings(),
       favoritesStore.fetchFavoriteIds(),
       favoritesStore.fetchFavoriteLinks()
