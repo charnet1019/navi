@@ -263,6 +263,7 @@ const handleUnlock = (user: User) => {
       try {
         await usersApi.unlock(user.id)
         message.success('用户已解锁')
+        await usersStore.fetchUsers()
       } catch (error) {
         message.error('解锁用户失败')
       }

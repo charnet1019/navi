@@ -44,7 +44,7 @@
                 <a-menu>
                   <a-menu-item @click="handleViewAssets(record)">已授权资产</a-menu-item>
                   <a-menu-item @click="handleResetPassword(record)">重置密码</a-menu-item>
-                  <a-menu-item @click="handleUnlock(record)">解锁</a-menu-item>
+                  <a-menu-item :disabled="!record.is_locked" @click="handleUnlock(record)">解锁</a-menu-item>
                   <a-menu-item v-if="record.is_active" danger @click="handleDisable(record)">禁用</a-menu-item>
                   <a-menu-item v-else @click="handleEnable(record)">启用</a-menu-item>
                   <a-menu-item danger @click="handleDelete(record)">删除</a-menu-item>
