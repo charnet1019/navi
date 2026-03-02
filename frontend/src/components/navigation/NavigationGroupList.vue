@@ -7,7 +7,11 @@
         :disabled="!isSuperuser"
         :animation="150"
         ghost-class="drag-ghost"
-        @end="onReorder"
+        group="nav-groups"
+        handle=".drag-handle"
+        @start="onDragStart"
+        @end="onDragEnd"
+        @change="onChange"
       >
         <template #item="{ element }">
           <NavGroupNode
@@ -37,6 +41,7 @@ import draggable from 'vuedraggable'
 import NavGroupNode from './NavGroupNode.vue'
 import { useNavigationStore } from '@/stores/navigation'
 import { useAuthStore } from '@/stores/auth'
+import { useDragState } from '@/composables/useDragState'
 import type { NavigationGroup } from '@/types'
 
 interface Props {
@@ -63,18 +68,50 @@ const emit = defineEmits<Emits>()
 const navigationStore = useNavigationStore()
 const authStore = useAuthStore()
 const isSuperuser = computed(() => authStore.isSuperuser)
+const { isDragging, draggedItemId } = useDragState()
 
 const localGroups = ref<NavigationGroup[]>([...props.groups])
 
 watch(() => props.groups, (newGroups) => {
-  localGroups.value = [...newGroups]
-}, { deep: true })
+  if (!isDragging.value) {
+    localGroups.value = [...newGroups]
+  }
+})
 
-const onReorder = async () => {
-  try {
-    await navigationStore.reorderGroups(localGroups.value.map(g => g.id))
-  } catch {
-    localGroups.value = [...props.groups]
+const onDragStart = (evt: { item: HTMLElement }) => {
+  isDragging.value = true
+  const groupId = evt.item.closest('[data-group-id]')?.getAttribute('data-group-id')
+  if (groupId) {
+    draggedItemId.value = groupId
+  }
+}
+
+type DragChangeEvent = {
+  moved?: { element: NavigationGroup; oldIndex: number; newIndex: number }
+  added?: { element: NavigationGroup; newIndex: number }
+}
+
+const onDragEnd = () => {
+  isDragging.value = false
+  draggedItemId.value = null
+}
+
+const onChange = async (evt: DragChangeEvent) => {
+  if (evt.moved) {
+    try {
+      await navigationStore.reorderGroups(localGroups.value.map(g => g.id))
+    } catch {
+      localGroups.value = [...props.groups]
+    }
+  } else if (evt.added) {
+    const movedId = evt.added.element.id
+    const orderedIds = localGroups.value.map(g => g.id)
+    try {
+      await navigationStore.updateGroup(movedId, { parent_id: null })
+      await navigationStore.reorderGroups(orderedIds)
+    } catch {
+      await navigationStore.fetchGroups()
+    }
   }
 }
 </script>
