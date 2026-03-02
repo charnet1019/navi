@@ -28,7 +28,7 @@ async def list_links(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(settings.DEFAULT_PAGE_SIZE, ge=1, le=settings.MAX_PAGE_SIZE),
+    limit: int = Query(1000, ge=1, le=10000),
 ) -> List[LinkResponse]:
     """
     List links (filtered by user permissions).
