@@ -29,6 +29,8 @@ async def list_links(
     current_user: Annotated[User, Depends(get_current_active_user)],
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=10000),
+    navigation_group_id: str | None = Query(None),
+    is_active: bool | None = Query(None),
 ) -> List[LinkResponse]:
     """
     List links (filtered by user permissions).
@@ -43,9 +45,10 @@ async def list_links(
         List of links the user has access to
     """
     if current_user.is_superuser:
-        stmt = select(Link).where(
-            Link.is_active == True
-        ).offset(skip).limit(limit).order_by(
+        conditions = [Link.is_active == (is_active if is_active is not None else True)]
+        if navigation_group_id:
+            conditions.append(Link.navigation_group_id == navigation_group_id)
+        stmt = select(Link).where(*conditions).offset(skip).limit(limit).order_by(
             Link.sort_order, Link.name
         )
     else:
@@ -65,9 +68,12 @@ async def list_links(
         has_all_access = all_perm.scalar_one_or_none() is not None
 
         if has_all_access:
-            stmt = select(Link).where(
-                Link.is_active == True
-            ).offset(skip).limit(limit).order_by(
+            conditions = [Link.is_active == True]
+            if navigation_group_id:
+                conditions.append(Link.navigation_group_id == navigation_group_id)
+            if is_active is not None:
+                conditions[0] = Link.is_active == is_active
+            stmt = select(Link).where(*conditions).offset(skip).limit(limit).order_by(
                 Link.sort_order, Link.name
             )
         else:
@@ -120,13 +126,17 @@ async def list_links(
                 LinkPermission.link_id
             ).where(or_(*link_filter))
 
-            stmt = select(Link).where(
-                Link.is_active == True,
-                or_(
-                    Link.navigation_group_id.in_(permitted_group_ids) if permitted_group_ids else False,
-                    Link.id.in_(direct_link_ids_stmt),
-                ),
-            ).offset(skip).limit(limit).order_by(
+            # Build base conditions
+            active_condition = Link.is_active == (is_active if is_active is not None else True)
+            perm_condition = or_(
+                Link.navigation_group_id.in_(permitted_group_ids) if permitted_group_ids else False,
+                Link.id.in_(direct_link_ids_stmt),
+            )
+            conditions = [active_condition, perm_condition]
+            if navigation_group_id:
+                conditions.append(Link.navigation_group_id == navigation_group_id)
+
+            stmt = select(Link).where(*conditions).offset(skip).limit(limit).order_by(
                 Link.sort_order, Link.name
             )
 
