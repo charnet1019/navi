@@ -3,7 +3,7 @@
     <a-upload
       :show-upload-list="false"
       :before-upload="handleBeforeUpload"
-      accept=".png,.jpg,.jpeg,.gif,.webp"
+      accept=".png,.jpg,.jpeg,.gif,.webp,.ico,.bmp,.tiff,.tif,.avif,.jfif"
     >
       <div v-if="imageUrl" class="image-preview">
         <img :src="imageUrl" alt="preview" class="preview-img" />
@@ -62,9 +62,9 @@ watch(() => props.modelValue, (newVal) => {
 })
 
 const handleBeforeUpload = async (file: File) => {
-  const isValidType = /\.(png|jpe?g|gif|webp)$/i.test(file.name)
+  const isValidType = /\.(png|jpe?g|gif|webp|ico|bmp|tiff?|avif|jfif)$/i.test(file.name)
   if (!isValidType) {
-    message.error('仅支持 PNG、JPG、GIF、WebP 格式的图片')
+    message.error('仅支持 PNG、JPG、GIF、WebP、ICO、BMP、TIFF、AVIF、JFIF 格式的图片')
     return false
   }
   const isLt10M = file.size / 1024 / 1024 < 10

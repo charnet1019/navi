@@ -39,7 +39,14 @@ class Settings(BaseSettings):
     # File Upload
     UPLOAD_DIR: str = "/app/uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
-    ALLOWED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+    ALLOWED_IMAGE_EXTENSIONS: set[str] = {
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",  # 常见格式
+        ".ico",  # Windows图标
+        ".bmp",  # 位图
+        ".tiff", ".tif",  # TIFF格式
+        ".avif",  # 新的高效格式
+        ".jfif",  # JPEG文件交换格式
+    }
 
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
