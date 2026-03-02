@@ -13,7 +13,7 @@
         :data-source="treeData"
         :loading="navigationStore.loading"
         row-key="id"
-        :default-expand-all-rows="true"
+        :default-expand-all-rows="false"
         :pagination="false"
       >
         <template #bodyCell="{ column, record }">

@@ -5,14 +5,12 @@
       :class="{
         active: selectedId === group.id,
         'has-children': hasChildren,
-        'nest-enabled': isDragging && isSuperuser && draggedItemId !== group.id
+        'nest-enabled': isDragging && isSuperuser && draggedItemId !== group.id,
+        'draggable': isSuperuser && selectedId === group.id && !collapsed
       }"
       :style="{ paddingLeft: `${16 + depth * 16}px` }"
       @click="handleClick"
     >
-      <span v-if="isSuperuser && !collapsed" class="drag-handle">
-        <HolderOutlined />
-      </span>
       <span class="toggle-icon" v-if="hasChildren && !collapsed">
         <RightOutlined :class="{ expanded: open }" />
       </span>
@@ -45,7 +43,7 @@
         :animation="150"
         ghost-class="drag-ghost"
         group="nav-groups"
-        handle=".drag-handle"
+        handle=".draggable"
         @start="onDragStart"
         @end="onDragEnd"
         @change="onChildChange"
@@ -66,7 +64,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { FolderOutlined, RightOutlined, HolderOutlined } from '@ant-design/icons-vue'
+import { FolderOutlined, RightOutlined } from '@ant-design/icons-vue'
 import draggable from 'vuedraggable'
 import { useNavigationStore } from '@/stores/navigation'
 import { useAuthStore } from '@/stores/auth'
@@ -221,23 +219,12 @@ const onNestAdd = async (evt: { newIndex: number }) => {
   padding-right: 16px;
 }
 
-.drag-handle {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  font-size: 12px;
-  opacity: 0;
+.nav-node-row.draggable {
   cursor: grab;
-  transition: opacity 0.2s;
-  color: rgba(255, 255, 255, 0.45);
 }
 
-.drag-handle:active {
+.nav-node-row.draggable:active {
   cursor: grabbing;
-}
-
-.nav-node-row:hover .drag-handle {
-  opacity: 1;
 }
 
 .nav-node-row:hover {

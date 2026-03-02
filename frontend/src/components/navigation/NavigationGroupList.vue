@@ -8,7 +8,7 @@
         :animation="150"
         ghost-class="drag-ghost"
         group="nav-groups"
-        handle=".drag-handle"
+        handle=".draggable"
         @start="onDragStart"
         @end="onDragEnd"
         @change="onChange"
