@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, ForeignKey, DateTime, CheckConstraint
+from sqlalchemy import Table, Column, ForeignKey, DateTime, CheckConstraint, Integer
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -61,6 +61,7 @@ user_favorites = Table(
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("link_id", UUID(as_uuid=True), ForeignKey("links.id", ondelete="CASCADE"), primary_key=True),
     Column("created_at", DateTime, default=now_cst, nullable=False),
+    Column("sort_order", Integer, nullable=False, default=0),
 )
 
 

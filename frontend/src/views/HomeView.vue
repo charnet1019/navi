@@ -35,7 +35,9 @@
           :loading="favoritesStore.loading"
           :columns="settingsStore.linksPerRow"
           :favorite-ids="favoritesStore.favoriteIds"
+          :editable="true"
           @toggle-favorite="handleToggleFavorite"
+          @reorder="handleReorderFavorites"
         />
       </div>
 
@@ -170,6 +172,14 @@ const handleToggleFavorite = async (linkId: string) => {
 const handleReorderLinks = async (orderedIds: string[]) => {
   try {
     await linksStore.reorderLinks(orderedIds)
+  } catch {
+    message.error('排序失败')
+  }
+}
+
+const handleReorderFavorites = async (orderedIds: string[]) => {
+  try {
+    await favoritesStore.reorderFavorites(orderedIds)
   } catch {
     message.error('排序失败')
   }

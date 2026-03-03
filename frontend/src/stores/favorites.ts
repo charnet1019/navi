@@ -59,6 +59,22 @@ export const useFavoritesStore = defineStore('favorites', () => {
     }
   }
 
+  async function reorderFavorites(orderedIds: string[]): Promise<void> {
+    try {
+      error.value = null
+      const items = orderedIds.map((id, index) => ({
+        link_id: id,
+        sort_order: index
+      }))
+      const updated = await favoritesApi.reorder(items)
+      favoriteLinks.value = updated
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reorder favorites'
+      error.value = msg
+      throw err
+    }
+  }
+
   return {
     favoriteIds,
     favoriteLinks,
@@ -67,6 +83,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     isFavorite,
     fetchFavoriteIds,
     fetchFavoriteLinks,
-    toggleFavorite
+    toggleFavorite,
+    reorderFavorites
   }
 })

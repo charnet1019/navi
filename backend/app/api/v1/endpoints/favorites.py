@@ -3,7 +3,8 @@
 from typing import Annotated, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, delete, or_
+from pydantic import BaseModel
+from sqlalchemy import select, delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -85,7 +86,7 @@ async def list_favorites(
                 )
             )
 
-    stmt = base_stmt.order_by(user_favorites.c.created_at.desc())
+    stmt = base_stmt.order_by(user_favorites.c.sort_order, user_favorites.c.created_at.desc())
     result = await db.execute(stmt)
     links = result.scalars().all()
     return [LinkResponse.model_validate(link) for link in links]
@@ -192,3 +193,32 @@ async def remove_favorite(
         )
     )
     await db.commit()
+
+
+class ReorderItem(BaseModel):
+    link_id: UUID
+    sort_order: int
+
+
+@router.put("/reorder", response_model=List[LinkResponse])
+async def reorder_favorites(
+    items: List[ReorderItem],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> List[LinkResponse]:
+    """Batch update sort order for user's favorite links."""
+    # Update sort_order for each favorite
+    for item in items:
+        await db.execute(
+            update(user_favorites)
+            .where(
+                user_favorites.c.user_id == current_user.id,
+                user_favorites.c.link_id == item.link_id,
+            )
+            .values(sort_order=item.sort_order)
+        )
+
+    await db.commit()
+
+    # Return updated favorites list
+    return await list_favorites(db, current_user)

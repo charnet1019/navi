@@ -18,5 +18,10 @@ export const favoritesApi = {
 
   async remove(linkId: string): Promise<void> {
     await apiClient.delete(`/favorites/${linkId}`)
+  },
+
+  async reorder(items: { link_id: string; sort_order: number }[]): Promise<Link[]> {
+    const response = await apiClient.put<Link[]>('/favorites/reorder', items)
+    return response.data
   }
 }
