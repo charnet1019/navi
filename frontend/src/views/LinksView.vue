@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LinkGrid from '@/components/links/LinkGrid.vue'
@@ -46,19 +46,27 @@ const settingsStore = useSettingsStore()
 const selectedGroupFilter = ref<string | undefined>(undefined)
 
 const filteredLinks = computed(() => {
-  if (!selectedGroupFilter.value) {
-    return linksStore.activeLinks
-  }
-  return linksStore.links.filter(link =>
-    link.navigation_group_id === selectedGroupFilter.value && link.is_active
-  )
+  return linksStore.activeLinks
 })
+
+const fetchFilteredLinks = async () => {
+  try {
+    await linksStore.fetchLinks({
+      navigation_group_id: selectedGroupFilter.value,
+      is_active: true
+    })
+  } catch (error) {
+    message.error('加载链接失败')
+  }
+}
+
+watch(selectedGroupFilter, fetchFilteredLinks)
 
 onMounted(async () => {
   try {
     await Promise.all([
       navigationStore.fetchGroups(),
-      linksStore.fetchLinks({ is_active: true }),
+      fetchFilteredLinks(),
       settingsStore.fetchPublicSettings()
     ])
   } catch (error) {
