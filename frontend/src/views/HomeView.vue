@@ -155,6 +155,10 @@ const handleDeleteLink = (link: Link) => {
       try {
         await linksStore.deleteLink(link.id)
         message.success('链接已删除')
+        // 如果在收藏夹视图，刷新收藏夹列表
+        if (!selectedGroup.value) {
+          await favoritesStore.fetchFavoriteLinks()
+        }
       } catch {
         message.error('删除链接失败')
       }
