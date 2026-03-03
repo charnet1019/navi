@@ -56,6 +56,7 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
       DEBUG: ${DEBUG}
       CORS_ORIGINS: ${CORS_ORIGINS}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
       LOG_LEVEL: ${LOG_LEVEL}
     volumes:
       - ./backend/uploads:/app/uploads
@@ -67,12 +68,20 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 256M
     networks:
       - navi-network
 
@@ -83,15 +92,23 @@ services:
       dockerfile: Dockerfile
     container_name: navi-frontend
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
     networks:
       - navi-network
 
