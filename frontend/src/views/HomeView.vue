@@ -35,7 +35,9 @@
           :loading="favoritesStore.loading"
           :columns="settingsStore.linksPerRow"
           :favorite-ids="favoritesStore.favoriteIds"
-          :editable="true"
+          :editable="authStore.isSuperuser"
+          @edit="handleEditLink"
+          @delete="handleDeleteLink"
           @toggle-favorite="handleToggleFavorite"
           @reorder="handleReorderFavorites"
         />
