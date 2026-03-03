@@ -120,6 +120,10 @@ const handleLinkSubmit = async (values: CreateLinkRequest | UpdateLinkRequest) =
     if (editingLink.value) {
       await linksStore.updateLink(editingLink.value.id, values as UpdateLinkRequest)
       message.success('链接已更新')
+      // 如果在收藏夹视图，刷新收藏夹列表
+      if (!selectedGroup.value) {
+        await favoritesStore.fetchFavoriteLinks()
+      }
     } else {
       const data = {
         ...values,
