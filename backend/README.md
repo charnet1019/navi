@@ -1,183 +1,167 @@
-# Navi Backend
+# Navi 后端
 
-FastAPI-based backend for the Navi navigation and link management system.
+Navi 后端基于 FastAPI 构建，为导航与链接管理系统提供 RESTful API、JWT 认证、角色权限控制、资源授权和系统管理能力。
 
-## Overview
+## 概览
 
-The backend provides a RESTful API with JWT authentication, role-based access control, and comprehensive data management capabilities.
+后端负责用户认证、用户管理、角色权限、用户组、导航分组、链接、收藏、系统设置、文件上传和审计日志等核心功能。
 
-## Technology Stack
+## 技术栈
 
-- **FastAPI**: Modern, fast web framework for building APIs
-- **PostgreSQL**: Primary database with async support via asyncpg
-- **Redis**: Caching and session management
-- **SQLAlchemy 2.0**: Async ORM for database operations
-- **Alembic**: Database migration tool
-- **Pydantic**: Data validation and settings management
-- **JWT**: Token-based authentication
-- **Uvicorn**: ASGI server
+- **FastAPI**：用于构建 API 的 Python Web 框架。
+- **PostgreSQL**：主数据库，通过 asyncpg 提供异步访问能力。
+- **Redis**：用于缓存、登录失败次数、token 黑名单等数据。
+- **SQLAlchemy 2.0**：异步 ORM。
+- **Alembic**：数据库迁移工具。
+- **Pydantic**：数据校验和配置管理。
+- **JWT**：token 认证机制。
+- **Uvicorn**：ASGI 服务运行器。
 
-## Project Structure
+## 项目结构
 
-```
+```text
 backend/
 ├── app/
 │   ├── api/
 │   │   └── v1/
-│   │       ├── endpoints/      # API endpoint handlers
-│   │       │   ├── auth.py     # Authentication endpoints
-│   │       │   ├── users.py    # User management
-│   │       │   ├── roles.py    # Role management
-│   │       │   ├── permissions.py # Permission management
-│   │       │   └── navigation.py  # Navigation endpoints
-│   │       └── router.py       # API router configuration
-│   ├── core/
-│   │   ├── config.py          # Application configuration
-│   │   ├── security.py        # Security utilities
-│   │   └── dependencies.py    # FastAPI dependencies
-│   ├── models/
-│   │   ├── user.py           # User model
-│   │   ├── role.py           # Role model
-│   │   ├── permission.py     # Permission model
-│   │   └── navigation.py     # Navigation model
-│   ├── schemas/
-│   │   ├── user.py           # User schemas
-│   │   ├── role.py           # Role schemas
-│   │   ├── permission.py     # Permission schemas
-│   │   ├── navigation.py     # Navigation schemas
-│   │   └── token.py          # Token schemas
-│   ├── services/
-│   │   ├── auth.py           # Authentication service
-│   │   ├── user.py           # User service
-│   │   ├── role.py           # Role service
-│   │   └── navigation.py     # Navigation service
-│   ├── database.py           # Database configuration
-│   ├── redis.py              # Redis configuration
-│   └── main.py               # Application entry point
+│   │       ├── endpoints/       # API 接口处理器
+│   │       │   ├── auth.py      # 认证接口
+│   │       │   ├── users.py     # 用户管理
+│   │       │   ├── roles.py     # 角色管理
+│   │       │   ├── permissions.py # 权限管理
+│   │       │   └── navigation.py # 导航接口
+│   │       └── router.py        # API 路由配置
+│   ├── core/                    # 核心功能
+│   ├── models/                  # 数据库模型
+│   ├── schemas/                 # Pydantic 数据结构
+│   ├── services/                # 业务服务
+│   ├── database.py              # 数据库配置
+│   ├── redis.py                 # Redis 配置
+│   └── main.py                  # 应用入口
 ├── alembic/
-│   ├── versions/             # Migration files
-│   └── env.py               # Alembic configuration
-├── tests/
-│   ├── conftest.py          # Test configuration
-│   └── test_*.py            # Test files
-├── uploads/                 # File upload directory
-├── Dockerfile              # Production Docker image
-├── Dockerfile.dev          # Development Docker image
-├── requirements.txt        # Python dependencies
-└── alembic.ini            # Alembic configuration
+│   ├── versions/                # 迁移文件
+│   └── env.py                   # Alembic 配置
+├── tests/                       # 测试文件
+├── uploads/                     # 文件上传目录
+├── Dockerfile                   # 生产镜像构建文件
+├── Dockerfile.dev               # 开发镜像构建文件
+├── requirements.txt             # Python 依赖
+└── alembic.ini                  # Alembic 配置文件
 ```
 
-## Setup
+## 安装与启动
 
-### Local Development
+### 本地开发
 
-1. Create a virtual environment:
+1. 创建虚拟环境：
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows 使用：venv\Scripts\activate
 ```
 
-2. Install dependencies:
+2. 安装依赖：
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Configure environment variables:
+3. 配置环境变量：
 ```bash
 cp ../.env.example ../.env
-# Edit .env with your configuration
+# 按实际环境修改 .env 配置
 ```
 
-4. Run database migrations:
+4. 执行数据库迁移：
 ```bash
 alembic upgrade head
 ```
 
-5. Start the development server:
+5. 启动开发服务器：
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Docker Development
+### Docker 开发环境
 
 ```bash
-# From project root
+# 在项目根目录执行
 docker-compose -f docker-compose.dev.yml up backend
 ```
 
-## API Endpoints
+## API 接口
 
-### Authentication
-- `POST /api/v1/auth/register` - Register new user
-- `POST /api/v1/auth/login` - Login and get tokens
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `POST /api/v1/auth/logout` - Logout user
-- `GET /api/v1/auth/me` - Get current user
+### 认证
+- `POST /api/v1/auth/register`：注册新用户。
+- `POST /api/v1/auth/login`：登录并写入认证 Cookie。
+- `POST /api/v1/auth/refresh`：刷新访问 token。
+- `POST /api/v1/auth/logout`：退出登录。
+- `GET /api/v1/auth/me`：获取当前登录用户。
 
-### Users
-- `GET /api/v1/users` - List users (admin only)
-- `GET /api/v1/users/{id}` - Get user by ID
-- `PUT /api/v1/users/{id}` - Update user
-- `DELETE /api/v1/users/{id}` - Delete user (admin only)
+### 用户
+- `GET /api/v1/users`：查询用户列表，仅管理员可用。
+- `GET /api/v1/users/{id}`：根据 ID 查询用户。
+- `PUT /api/v1/users/{id}`：更新用户。
+- `DELETE /api/v1/users/{id}`：删除用户，仅管理员可用。
 
-### Roles
-- `GET /api/v1/roles` - List roles
-- `POST /api/v1/roles` - Create role (admin only)
-- `GET /api/v1/roles/{id}` - Get role by ID
-- `PUT /api/v1/roles/{id}` - Update role (admin only)
-- `DELETE /api/v1/roles/{id}` - Delete role (admin only)
+### 角色
+- `GET /api/v1/roles`：查询角色列表。
+- `POST /api/v1/roles`：创建角色，仅管理员可用。
+- `GET /api/v1/roles/{id}`：根据 ID 查询角色。
+- `PUT /api/v1/roles/{id}`：更新角色，仅管理员可用。
+- `DELETE /api/v1/roles/{id}`：删除角色，仅管理员可用。
 
-### Permissions
-- `GET /api/v1/permissions` - List permissions
-- `POST /api/v1/permissions` - Create permission (admin only)
+### 权限
+- `GET /api/v1/permissions`：查询权限列表。
 
-### Navigation
-- `GET /api/v1/navigation` - List navigation items
-- `POST /api/v1/navigation` - Create navigation item
-- `GET /api/v1/navigation/{id}` - Get navigation item
-- `PUT /api/v1/navigation/{id}` - Update navigation item
-- `DELETE /api/v1/navigation/{id}` - Delete navigation item
+### 导航分组与链接
+- `GET /api/v1/navigation-groups`：查询导航分组。
+- `POST /api/v1/navigation-groups`：创建导航分组。
+- `PUT /api/v1/navigation-groups/{id}`：更新导航分组。
+- `DELETE /api/v1/navigation-groups/{id}`：删除导航分组。
+- `GET /api/v1/links`：查询链接。
+- `POST /api/v1/links`：创建链接。
+- `PUT /api/v1/links/{id}`：更新链接。
+- `DELETE /api/v1/links/{id}`：删除链接。
 
-## Database Migrations
+## 数据库迁移
 
-### Create a new migration
+### 创建新迁移
 ```bash
-alembic revision --autogenerate -m "Description of changes"
+alembic revision --autogenerate -m "变更说明"
 ```
 
-### Apply migrations
+### 应用迁移
 ```bash
 alembic upgrade head
 ```
 
-### Rollback migration
+### 回滚迁移
 ```bash
 alembic downgrade -1
 ```
 
-### View migration history
+### 查看迁移历史
 ```bash
 alembic history
 ```
 
-### View current version
+### 查看当前版本
 ```bash
 alembic current
 ```
 
-## Testing
+## 测试
 
-Run all tests:
+运行全部测试：
 ```bash
 pytest
 ```
 
-Run with coverage:
+生成覆盖率报告：
 ```bash
 pytest --cov=app --cov-report=html
 ```
 
-Run specific test file:
+运行指定测试文件：
 ```bash
 pytest tests/test_auth.py
 ```

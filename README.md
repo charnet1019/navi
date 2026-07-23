@@ -1,119 +1,119 @@
-# Navi - Navigation & Link Management System
+# Navi 导航与链接管理系统
 
-A modern, full-stack web application for managing navigation links with role-based access control (RBAC).
+Navi 是一个用于管理导航链接的全栈 Web 应用，支持基于角色的访问控制、导航分组、链接管理、用户管理和系统设置。
 
-## Features
+## 功能特性
 
-- **User Authentication**: Secure JWT-based authentication with access and refresh tokens
-- **Role-Based Access Control**: Fine-grained permissions system with roles and permissions
-- **Navigation Management**: Create, organize, and manage navigation links
-- **Admin Dashboard**: Comprehensive admin interface for user and system management
-- **Modern UI**: Built with Vue 3, Ant Design Vue, and TypeScript
-- **RESTful API**: FastAPI backend with automatic OpenAPI documentation
-- **Caching**: Redis-based caching for improved performance
-- **Docker Support**: Full containerization with Docker and Docker Compose
+- **用户认证**：基于 JWT 与 HttpOnly Cookie 的登录认证，支持访问 token 和刷新 token。
+- **角色权限控制**：支持角色、权限、用户组和细粒度资源授权。
+- **导航管理**：支持创建、组织和管理导航分组与链接。
+- **后台管理**：提供用户、用户组、角色、链接、导航分组、权限、系统设置和审计日志管理。
+- **现代前端**：基于 Vue 3、Ant Design Vue 和 TypeScript 构建。
+- **RESTful API**：后端基于 FastAPI，提供自动接口文档。
+- **缓存支持**：使用 Redis 缓存权限、登录失败次数和 token 黑名单等数据。
+- **容器化部署**：支持 Docker Compose 和 Kubernetes 部署。
 
-## Tech Stack
+## 技术栈
 
-### Backend
-- **FastAPI**: Modern Python web framework
-- **PostgreSQL**: Relational database
-- **Redis**: Caching and session management
-- **SQLAlchemy**: ORM with async support
-- **Alembic**: Database migrations
-- **JWT**: Token-based authentication
+### 后端
+- **FastAPI**：Python Web 框架。
+- **PostgreSQL**：关系型数据库。
+- **Redis**：缓存和会话辅助存储。
+- **SQLAlchemy**：异步 ORM。
+- **Alembic**：数据库迁移工具。
+- **JWT**：token 认证机制。
 
-### Frontend
-- **Vue 3**: Progressive JavaScript framework
-- **TypeScript**: Type-safe development
-- **Ant Design Vue**: UI component library
-- **Pinia**: State management
-- **Vue Router**: Client-side routing
-- **Axios**: HTTP client
-- **Vite**: Build tool and dev server
+### 前端
+- **Vue 3**：前端框架。
+- **TypeScript**：类型安全的前端开发语言。
+- **Ant Design Vue**：UI 组件库。
+- **Pinia**：状态管理。
+- **Vue Router**：前端路由。
+- **Axios**：HTTP 请求客户端。
+- **Vite**：构建工具和开发服务器。
 
-## Quick Start
+## 快速开始
 
-### Prerequisites
+### 环境要求
 
-- Docker and Docker Compose
+- Docker 和 Docker Compose
 - Git
 
-### Development Setup
+### 开发环境启动
 
-1. Clone the repository:
+1. 克隆代码仓库：
 ```bash
 git clone <repository-url>
 cd navi
 ```
 
-2. Create environment file:
+2. 创建环境变量文件：
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# 按实际环境修改 .env 配置
 ```
 
-3. Start development environment:
+3. 启动开发环境：
 ```bash
 ./scripts/start-dev.sh
 ```
 
-4. Access the application:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+4. 访问应用：
+- 前端地址：http://localhost:5173
+- 后端接口：http://localhost:8000
+- 接口文档：http://localhost:8000/docs
 
-### Default Login
+### 默认登录账号
 
-The initial database migration creates a default administrator account:
+初始数据库迁移会创建默认管理员账号：
 
-- Username: `admin`
-- Password: `admin123`
+- 用户名：`admin`
+- 密码：`admin123`
 
-Change this password immediately after first login, especially outside local development.
+首次登录后请立即修改默认密码，生产环境尤其必须修改。
 
-### Production Deployment
+### 生产环境部署
 
-1. Configure environment variables in `.env`
+1. 在 `.env` 中配置生产环境变量。
 
-2. Start production environment:
+2. 启动生产环境：
 ```bash
 ./scripts/start-prod.sh
 ```
 
-3. Access the application:
-- Frontend: http://localhost:80
-- Backend API: http://localhost:8000
+3. 访问应用：
+- 前端地址：http://localhost:80
+- 后端接口：http://localhost:8000
 
-## Project Structure
+## 项目结构
 
-```
+```text
 navi/
-├── backend/              # FastAPI backend
-│   ├── app/             # Application code
-│   │   ├── api/         # API routes
-│   │   ├── core/        # Core functionality
-│   │   ├── models/      # Database models
-│   │   ├── schemas/     # Pydantic schemas
-│   │   └── services/    # Business logic
-│   ├── alembic/         # Database migrations
-│   ├── tests/           # Backend tests
-│   ├── Dockerfile       # Production Docker image
-│   └── requirements.txt # Python dependencies
-├── frontend/            # Vue.js frontend
-│   ├── src/            # Application code
-│   │   ├── api/        # API client
-│   │   ├── components/ # Vue components
-│   │   ├── router/     # Route definitions
-│   │   ├── stores/     # Pinia stores
-│   │   ├── types/      # TypeScript types
-│   │   └── views/      # Page components
-│   ├── Dockerfile      # Production Docker image
-│   └── package.json    # Node dependencies
-├── scripts/            # Utility scripts
-├── docker-compose.yml  # Production compose file
-├── docker-compose.dev.yml # Development compose file
-└── README.md          # This file
+├── backend/              # FastAPI 后端
+│   ├── app/              # 后端应用代码
+│   │   ├── api/          # API 路由
+│   │   ├── core/         # 核心功能
+│   │   ├── models/       # 数据库模型
+│   │   ├── schemas/      # Pydantic 数据结构
+│   │   └── services/     # 业务服务
+│   ├── alembic/          # 数据库迁移
+│   ├── tests/            # 后端测试
+│   ├── Dockerfile        # 生产镜像构建文件
+│   └── requirements.txt  # Python 依赖
+├── frontend/             # Vue 前端
+│   ├── src/              # 前端应用代码
+│   │   ├── api/          # API 客户端
+│   │   ├── components/   # Vue 组件
+│   │   ├── router/       # 路由定义
+│   │   ├── stores/       # Pinia 状态
+│   │   ├── types/        # TypeScript 类型
+│   │   └── views/        # 页面视图
+│   ├── Dockerfile        # 生产镜像构建文件
+│   └── package.json      # Node 依赖
+├── scripts/              # 脚本工具
+├── docker-compose.yml    # 生产 Compose 文件
+├── docker-compose.dev.yml # 开发 Compose 文件
+└── README.md             # 项目说明
 ```
 
 ## 环境变量
@@ -157,105 +157,105 @@ CORS_ALLOW_CREDENTIALS=true
 
 JWT 保存在 HttpOnly Cookie 中，前端 JavaScript 无法读取认证 token。非 GET/HEAD 等安全请求使用 CSRF 双重提交校验：后端写入 `AUTH_CSRF_COOKIE_NAME` 指定的 Cookie，前端读取该 CSRF Cookie 后通过 `AUTH_CSRF_HEADER_NAME` 指定的请求头回传。
 
-## API Documentation
+## API 文档
 
-Interactive API documentation is available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+交互式 API 文档地址：
+- Swagger UI：http://localhost:8000/docs
+- ReDoc：http://localhost:8000/redoc
 
-## Development
+## 开发
 
-### Backend Development
+### 后端开发
 
 ```bash
 cd backend
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Run migrations
+# 执行数据库迁移
 alembic upgrade head
 
-# Start development server
+# 启动开发服务器
 uvicorn app.main:app --reload
 ```
 
-### Frontend Development
+### 前端开发
 
 ```bash
 cd frontend
 
-# Install dependencies
+# 安装依赖
 npm install
 
-# Start development server
+# 启动开发服务器
 npm run dev
 
-# Build for production
+# 构建生产产物
 npm run build
 ```
 
-## Testing
+## 测试
 
-### Backend Tests
+### 后端测试
 ```bash
 cd backend
 pytest
 ```
 
-### Frontend Tests
+### 前端测试
 ```bash
 cd frontend
 npm run test
 ```
 
-## Database Migrations
+## 数据库迁移
 
-Create a new migration:
+创建新迁移：
 ```bash
 cd backend
-alembic revision --autogenerate -m "Description"
+alembic revision --autogenerate -m "变更说明"
 ```
 
-Apply migrations:
+应用迁移：
 ```bash
 alembic upgrade head
 ```
 
-Rollback migration:
+回滚迁移：
 ```bash
 alembic downgrade -1
 ```
 
-## Docker Commands
+## Docker 命令
 
-### Development
+### 开发环境
 ```bash
-# Start all services
+# 启动所有服务
 docker-compose -f docker-compose.dev.yml up -d
 
-# View logs
+# 查看日志
 docker-compose -f docker-compose.dev.yml logs -f
 
-# Stop all services
+# 停止所有服务
 docker-compose -f docker-compose.dev.yml down
 
-# Rebuild images
+# 重新构建镜像
 docker-compose -f docker-compose.dev.yml build
 ```
 
-### Production
+### 生产环境
 ```bash
-# Start all services
+# 启动所有服务
 docker-compose up -d
 
-# View logs
+# 查看日志
 docker-compose logs -f
 
-# Stop all services
+# 停止所有服务
 docker-compose down
 
-# Rebuild images
+# 重新构建镜像
 docker-compose build --no-cache
 ```
 
@@ -268,7 +268,7 @@ docker-compose build --no-cache
 5. **启用安全 Cookie**：HTTPS 生产环境设置 `AUTH_COOKIE_SECURE=true`；完全跨站点部署时设置 `AUTH_COOKIE_SAMESITE=none`。
 6. **限流与依赖更新**：生产环境建议增加接口限流，并定期更新依赖。
 
-## Troubleshooting
+## 排错
 
 ### 数据库连接异常
 - 确认 PostgreSQL 容器正在运行：`docker-compose ps`
@@ -285,14 +285,14 @@ docker-compose build --no-cache
 - 确认 `CORS_ORIGINS` 包含前端地址，且 `CORS_ALLOW_CREDENTIALS` 配置符合 Cookie 登录要求
 - 查看浏览器控制台错误信息
 
-## License
+## 许可证
 
-[Your License Here]
+待补充。
 
-## Contributing
+## 贡献指南
 
-[Your Contributing Guidelines Here]
+待补充。
 
-## Support
+## 支持
 
-[Your Support Information Here]
+待补充。
