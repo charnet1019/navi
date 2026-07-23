@@ -116,26 +116,46 @@ navi/
 └── README.md          # This file
 ```
 
-## Environment Variables
+## 环境变量
 
-See `.env.example` for all available configuration options.
+完整配置项请参考 `.env.example`。
 
-Key variables:
-- `POSTGRES_PASSWORD`: Database password
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `SECRET_KEY`: JWT signing key (change in production!)
-- `DEBUG`: Enable debug mode (false in production)
-- `CORS_ORIGINS`: Allowed CORS origins, default `*`
-- `CORS_ALLOW_CREDENTIALS`: Allow credentialed CORS requests when `CORS_ORIGINS` is not `*`
-- `AUTH_COOKIE_SECURE`: Set auth cookies as Secure; use `true` on HTTPS production
-- `AUTH_COOKIE_SAMESITE`: Auth cookie SameSite policy; default `lax`
-- `AUTH_COOKIE_DOMAIN`: Optional cookie domain for shared subdomains
-- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`: CSRF double-submit cookie/header names
+关键配置：
+- `POSTGRES_PASSWORD`：数据库密码。
+- `DATABASE_URL`：PostgreSQL 数据库连接地址。
+- `REDIS_URL`：Redis 连接地址。
+- `SECRET_KEY`：JWT 签名密钥，生产环境必须修改。
+- `DEBUG`：是否启用调试模式，生产环境应设置为 `false`。
+- `CORS_ORIGINS`：允许跨域访问的前端域名，默认 `*`。生产环境建议指定明确域名，例如 `https://navi.example.com`。
+- `CORS_ALLOW_CREDENTIALS`：是否允许跨域请求携带 Cookie。使用固定前端域名和 HttpOnly Cookie 登录时应设置为 `true`。
+- `AUTH_COOKIE_SECURE`：是否仅通过 HTTPS 发送认证 Cookie。生产环境建议设置为 `true`。
+- `AUTH_COOKIE_SAMESITE`：认证 Cookie 的 SameSite 策略，默认 `lax`。前后端完全跨站点域名时需设置为 `none`，并同时启用 `AUTH_COOKIE_SECURE=true`。
+- `AUTH_COOKIE_DOMAIN`：可选的 Cookie 域名，用于同一主域下多个子域共享登录态。
+- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`：CSRF 双重提交校验使用的 Cookie 名称和请求头名称。
 
-### HttpOnly Cookie Authentication
+### 生产环境 Cookie 与 CORS 推荐配置
 
-JWTs are stored in HttpOnly cookies and are not exposed to frontend JavaScript. Unsafe API requests use a double-submit CSRF token: the backend sets `AUTH_CSRF_COOKIE_NAME`, and the frontend sends the same value in `AUTH_CSRF_HEADER_NAME`. For HTTPS production set `AUTH_COOKIE_SECURE=true`; if frontend and backend are truly cross-site, use `AUTH_COOKIE_SAMESITE=none` with Secure cookies.
+前后端在同站点或同一主域下部署时，建议：
+
+```env
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=lax
+CORS_ORIGINS=https://你的前端域名
+CORS_ALLOW_CREDENTIALS=true
+```
+
+如果前后端是完全跨站点域名，则使用：
+
+```env
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=none
+CORS_ORIGINS=https://你的前端域名
+CORS_ALLOW_CREDENTIALS=true
+```
+
+### HttpOnly Cookie 认证
+
+JWT 保存在 HttpOnly Cookie 中，前端 JavaScript 无法读取认证 token。非 GET/HEAD 等安全请求使用 CSRF 双重提交校验：后端写入 `AUTH_CSRF_COOKIE_NAME` 指定的 Cookie，前端读取该 CSRF Cookie 后通过 `AUTH_CSRF_HEADER_NAME` 指定的请求头回传。
 
 ## API Documentation
 
@@ -239,31 +259,31 @@ docker-compose down
 docker-compose build --no-cache
 ```
 
-## Security Considerations
+## 安全建议
 
-1. **Change default credentials**: Update the default admin password, `SECRET_KEY`, and `POSTGRES_PASSWORD` in production
-2. **Use HTTPS**: Configure SSL/TLS certificates for production
-3. **Environment variables**: Never commit `.env` files to version control
-4. **CORS configuration**: Set `CORS_ORIGINS` to your frontend origin(s) and keep `CORS_ALLOW_CREDENTIALS=true` when using a fixed domain
-5. **Rate limiting**: Consider adding rate limiting for production
-6. **Regular updates**: Keep dependencies up to date
+1. **修改默认凭据**：生产环境必须修改默认管理员密码、`SECRET_KEY` 和 `POSTGRES_PASSWORD`。
+2. **启用 HTTPS**：生产环境应配置 SSL/TLS 证书。
+3. **保护环境变量**：不要将 `.env` 文件提交到版本控制系统。
+4. **收紧 CORS 配置**：生产环境将 `CORS_ORIGINS` 设置为明确的前端域名，并在使用 Cookie 登录时保持 `CORS_ALLOW_CREDENTIALS=true`。
+5. **启用安全 Cookie**：HTTPS 生产环境设置 `AUTH_COOKIE_SECURE=true`；完全跨站点部署时设置 `AUTH_COOKIE_SAMESITE=none`。
+6. **限流与依赖更新**：生产环境建议增加接口限流，并定期更新依赖。
 
 ## Troubleshooting
 
-### Database connection issues
-- Ensure PostgreSQL container is running: `docker-compose ps`
-- Check database logs: `docker-compose logs postgres`
-- Verify DATABASE_URL in .env
+### 数据库连接异常
+- 确认 PostgreSQL 容器正在运行：`docker-compose ps`
+- 查看数据库日志：`docker-compose logs postgres`
+- 检查 `.env` 中的 `DATABASE_URL` 是否正确
 
-### Redis connection issues
-- Ensure Redis container is running: `docker-compose ps`
-- Check Redis logs: `docker-compose logs redis`
-- Verify REDIS_URL in .env
+### Redis 连接异常
+- 确认 Redis 容器正在运行：`docker-compose ps`
+- 查看 Redis 日志：`docker-compose logs redis`
+- 检查 `.env` 中的 `REDIS_URL` 是否正确
 
-### Frontend not loading
-- Check if backend is running: `curl http://localhost:8000/health`
-- Verify `CORS_ORIGINS` includes the frontend URL and `CORS_ALLOW_CREDENTIALS` is set appropriately
-- Check browser console for errors
+### 前端页面无法加载
+- 检查后端是否正常运行：`curl http://localhost:8000/health`
+- 确认 `CORS_ORIGINS` 包含前端地址，且 `CORS_ALLOW_CREDENTIALS` 配置符合 Cookie 登录要求
+- 查看浏览器控制台错误信息
 
 ## License
 

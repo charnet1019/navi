@@ -182,127 +182,147 @@ Run specific test file:
 pytest tests/test_auth.py
 ```
 
-## Configuration
+## 配置说明
 
-Configuration is managed through environment variables and the `app/core/config.py` file.
+后端配置通过环境变量和 `app/config.py` 管理。完整配置项请参考项目根目录 `.env.example`。
 
-### Key Configuration Options
+### 关键配置项
 
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `SECRET_KEY`: JWT signing key
-- `ALGORITHM`: JWT algorithm (default: HS256)
-- `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime
-- `REFRESH_TOKEN_EXPIRE_DAYS`: Refresh token lifetime
-- `DEBUG`: Enable debug mode
-- `CORS_ORIGINS`: Allowed CORS origins, default `*`
-- `CORS_ALLOW_CREDENTIALS`: Allow credentialed CORS requests when `CORS_ORIGINS` is not `*`
-- `AUTH_COOKIE_SECURE`: Set auth cookies as Secure; use `true` on HTTPS production
-- `AUTH_COOKIE_SAMESITE`: Auth cookie SameSite policy; default `lax`
-- `AUTH_COOKIE_DOMAIN`: Optional cookie domain for shared subdomains
-- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`: CSRF double-submit cookie/header names
-- `LOG_LEVEL`: Logging level
+- `DATABASE_URL`：PostgreSQL 数据库连接地址。
+- `REDIS_URL`：Redis 连接地址。
+- `SECRET_KEY`：JWT 签名密钥，生产环境必须修改。
+- `ALGORITHM`：JWT 签名算法，默认 `HS256`。
+- `ACCESS_TOKEN_EXPIRE_MINUTES`：访问 token 有效期。
+- `REFRESH_TOKEN_EXPIRE_DAYS`：刷新 token 有效期。
+- `DEBUG`：是否启用调试模式，生产环境应设置为 `false`。
+- `CORS_ORIGINS`：允许跨域访问的前端域名，默认 `*`。生产环境建议指定明确域名，例如 `https://navi.example.com`。
+- `CORS_ALLOW_CREDENTIALS`：是否允许跨域请求携带 Cookie。使用固定前端域名和 HttpOnly Cookie 登录时应设置为 `true`。
+- `AUTH_COOKIE_SECURE`：是否仅通过 HTTPS 发送认证 Cookie。生产环境建议设置为 `true`。
+- `AUTH_COOKIE_SAMESITE`：认证 Cookie 的 SameSite 策略，默认 `lax`。前后端完全跨站点域名时需设置为 `none`，并同时启用 `AUTH_COOKIE_SECURE=true`。
+- `AUTH_COOKIE_DOMAIN`：可选的 Cookie 域名，用于同一主域下多个子域共享登录态。
+- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`：CSRF 双重提交校验使用的 Cookie 名称和请求头名称。
+- `LOG_LEVEL`：日志级别。
 
-## Security
+### 生产环境 Cookie 与 CORS 推荐配置
 
-### Authentication Flow
+前后端在同站点或同一主域下部署时，建议：
 
-1. User registers or logs in with credentials
-2. Server validates credentials and returns JWT tokens
-3. Client stores tokens and includes access token in requests
-4. Server validates token on each request
-5. Client refreshes access token using refresh token when expired
+```env
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=lax
+CORS_ORIGINS=https://你的前端域名
+CORS_ALLOW_CREDENTIALS=true
+```
 
-### Password Security
+如果前后端是完全跨站点域名，则使用：
 
-- Passwords are hashed using bcrypt
-- Minimum password requirements enforced
-- Password reset functionality available
+```env
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=none
+CORS_ORIGINS=https://你的前端域名
+CORS_ALLOW_CREDENTIALS=true
+```
 
-### RBAC System
+## 安全说明
 
-- Users are assigned roles
-- Roles have associated permissions
-- Endpoints check for required permissions
-- Hierarchical permission inheritance
+### 认证流程
 
-## Caching
+1. 用户提交用户名和密码登录。
+2. 后端校验凭据并签发访问 token 和刷新 token。
+3. token 写入 HttpOnly Cookie，前端 JavaScript 无法读取认证 token。
+4. 浏览器后续请求会自动携带认证 Cookie，后端在每次请求中校验登录状态。
+5. 非 GET/HEAD 等安全请求需要携带 CSRF 请求头，刷新 token 过期前可自动续期登录状态。
 
-Redis is used for:
-- Session management
-- Token blacklisting
-- Rate limiting
-- Frequently accessed data caching
+### 密码安全
 
-## Error Handling
+- 密码使用 bcrypt 哈希保存。
+- 系统会按当前密码规则校验最小长度和复杂度。
+- 管理员可重置用户密码，用户也可修改自己的密码。
 
-The API uses standard HTTP status codes:
-- `200`: Success
-- `201`: Created
-- `400`: Bad Request
-- `401`: Unauthorized
-- `403`: Forbidden
-- `404`: Not Found
-- `422`: Validation Error
-- `500`: Internal Server Error
+### RBAC 权限体系
 
-Error responses follow this format:
+- 用户通过角色获得基础权限。
+- 角色可以绑定多个权限。
+- 接口会按所需权限进行访问校验。
+- 导航分组和链接支持细粒度授权。
+
+## 缓存
+
+Redis 用于：
+- 登录会话辅助管理。
+- token 黑名单。
+- 登录失败次数和锁定状态。
+- 用户权限缓存。
+
+## 错误处理
+
+API 使用标准 HTTP 状态码：
+- `200`：请求成功。
+- `201`：创建成功。
+- `400`：请求参数错误。
+- `401`：未登录或认证失败。
+- `403`：无权限访问。
+- `404`：资源不存在。
+- `422`：请求数据校验失败。
+- `500`：服务器内部错误。
+
+错误响应格式：
 ```json
 {
-  "detail": "Error message"
+  "detail": "错误信息"
 }
 ```
 
-## Logging
+## 日志
 
-Logs are configured based on the `LOG_LEVEL` environment variable.
+日志级别通过 `LOG_LEVEL` 环境变量配置。
 
-Available levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+可用级别：`DEBUG`、`INFO`、`WARNING`、`ERROR`、`CRITICAL`。
 
-## Performance Optimization
+## 性能优化
 
-- Async database operations
-- Connection pooling
-- Redis caching
-- Query optimization with SQLAlchemy
-- Lazy loading of relationships
+- 使用异步数据库访问。
+- 配置数据库连接池。
+- 使用 Redis 缓存权限等高频数据。
+- 通过 SQLAlchemy 优化查询。
+- 避免不必要的关系数据加载。
 
-## Development Guidelines
+## 开发规范
 
-1. Follow PEP 8 style guide
-2. Use type hints for all functions
-3. Write docstrings for all public functions
-4. Create tests for new features
-5. Use async/await for I/O operations
-6. Validate input with Pydantic schemas
-7. Handle errors appropriately
-8. Use dependency injection
+1. 遵循 PEP 8 代码风格。
+2. 函数尽量补充类型标注。
+3. 公共函数保留必要的 docstring。
+4. 新功能应补充对应测试。
+5. I/O 操作优先使用 async/await。
+6. 使用 Pydantic schema 校验输入。
+7. 明确处理异常和错误响应。
+8. 复用 FastAPI 依赖注入。
 
-## Troubleshooting
+## 排错
 
-### Database connection errors
-- Verify DATABASE_URL is correct
-- Ensure PostgreSQL is running
-- Check network connectivity
+### 数据库连接异常
+- 检查 `DATABASE_URL` 是否正确。
+- 确认 PostgreSQL 正在运行。
+- 检查网络连通性。
 
-### Redis connection errors
-- Verify REDIS_URL is correct
-- Ensure Redis is running
-- Check if Redis requires authentication
+### Redis 连接异常
+- 检查 `REDIS_URL` 是否正确。
+- 确认 Redis 正在运行。
+- 如果 Redis 设置了密码，确认连接地址中已包含密码。
 
-### Migration errors
-- Check alembic.ini configuration
-- Verify database permissions
-- Review migration files for conflicts
+### 数据库迁移异常
+- 检查 `alembic.ini` 配置。
+- 确认数据库账号有足够权限。
+- 检查迁移文件是否存在冲突。
 
-### Import errors
-- Ensure virtual environment is activated
-- Verify all dependencies are installed
-- Check Python version compatibility
+### Python 导入异常
+- 确认虚拟环境已激活。
+- 确认依赖已完整安装。
+- 检查 Python 版本是否兼容。
 
-## Additional Resources
+## 相关资源
 
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [Alembic Documentation](https://alembic.sqlalchemy.org/)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
+- [FastAPI 文档](https://fastapi.tiangolo.com/)
+- [SQLAlchemy 文档](https://docs.sqlalchemy.org/)
+- [Alembic 文档](https://alembic.sqlalchemy.org/)
+- [Pydantic 文档](https://docs.pydantic.dev/)

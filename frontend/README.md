@@ -318,11 +318,11 @@ Output is generated in the `dist/` directory.
 docker build -t navi-frontend .
 ```
 
-### Environment Variables
-Configure via `.env` file:
-- `VITE_API_BASE_URL`: Backend API base URL
-- `VITE_CSRF_COOKIE_NAME`: CSRF cookie name, must match backend `AUTH_CSRF_COOKIE_NAME`
-- `VITE_CSRF_HEADER_NAME`: CSRF request header name, must match backend `AUTH_CSRF_HEADER_NAME`
+### 环境变量
+通过 `.env` 文件配置：
+- `VITE_API_BASE_URL`：后端 API 基础地址。
+- `VITE_CSRF_COOKIE_NAME`：CSRF Cookie 名称，必须与后端 `AUTH_CSRF_COOKIE_NAME` 保持一致。
+- `VITE_CSRF_HEADER_NAME`：CSRF 请求头名称，必须与后端 `AUTH_CSRF_HEADER_NAME` 保持一致。
 
 ## Browser Support
 
