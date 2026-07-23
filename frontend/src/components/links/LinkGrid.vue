@@ -77,7 +77,7 @@ const localLinks = ref<Link[]>([...props.links])
 
 watch(() => props.links, (newLinks) => {
   localLinks.value = [...newLinks]
-}, { deep: true })
+})
 
 const gridStyle = computed(() => ({
   '--grid-columns': props.columns

@@ -167,7 +167,7 @@ watch(() => props.initialValues, (newValues) => {
     formState.open_in_new_tab = true
     formState.navigation_group_id = props.defaultGroupId
   }
-}, { deep: true })
+})
 
 const handleSubmit = () => {
   const values: CreateLinkRequest | UpdateLinkRequest = {

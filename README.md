@@ -63,6 +63,15 @@ cp .env.example .env
 - Backend API: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
 
+### Default Login
+
+The initial database migration creates a default administrator account:
+
+- Username: `admin`
+- Password: `admin123`
+
+Change this password immediately after first login, especially outside local development.
+
 ### Production Deployment
 
 1. Configure environment variables in `.env`
@@ -117,7 +126,16 @@ Key variables:
 - `REDIS_URL`: Redis connection string
 - `SECRET_KEY`: JWT signing key (change in production!)
 - `DEBUG`: Enable debug mode (false in production)
-- `CORS_ORIGINS`: Allowed CORS origins
+- `CORS_ORIGINS`: Allowed CORS origins, default `*`
+- `CORS_ALLOW_CREDENTIALS`: Allow credentialed CORS requests when `CORS_ORIGINS` is not `*`
+- `AUTH_COOKIE_SECURE`: Set auth cookies as Secure; use `true` on HTTPS production
+- `AUTH_COOKIE_SAMESITE`: Auth cookie SameSite policy; default `lax`
+- `AUTH_COOKIE_DOMAIN`: Optional cookie domain for shared subdomains
+- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`: CSRF double-submit cookie/header names
+
+### HttpOnly Cookie Authentication
+
+JWTs are stored in HttpOnly cookies and are not exposed to frontend JavaScript. Unsafe API requests use a double-submit CSRF token: the backend sets `AUTH_CSRF_COOKIE_NAME`, and the frontend sends the same value in `AUTH_CSRF_HEADER_NAME`. For HTTPS production set `AUTH_COOKIE_SECURE=true`; if frontend and backend are truly cross-site, use `AUTH_COOKIE_SAMESITE=none` with Secure cookies.
 
 ## API Documentation
 
@@ -223,10 +241,10 @@ docker-compose build --no-cache
 
 ## Security Considerations
 
-1. **Change default credentials**: Update `SECRET_KEY` and `POSTGRES_PASSWORD` in production
+1. **Change default credentials**: Update the default admin password, `SECRET_KEY`, and `POSTGRES_PASSWORD` in production
 2. **Use HTTPS**: Configure SSL/TLS certificates for production
 3. **Environment variables**: Never commit `.env` files to version control
-4. **CORS configuration**: Restrict `CORS_ORIGINS` to trusted domains
+4. **CORS configuration**: Set `CORS_ORIGINS` to your frontend origin(s) and keep `CORS_ALLOW_CREDENTIALS=true` when using a fixed domain
 5. **Rate limiting**: Consider adding rate limiting for production
 6. **Regular updates**: Keep dependencies up to date
 
@@ -244,7 +262,7 @@ docker-compose build --no-cache
 
 ### Frontend not loading
 - Check if backend is running: `curl http://localhost:8000/health`
-- Verify CORS_ORIGINS includes frontend URL
+- Verify `CORS_ORIGINS` includes the frontend URL and `CORS_ALLOW_CREDENTIALS` is set appropriately
 - Check browser console for errors
 
 ## License

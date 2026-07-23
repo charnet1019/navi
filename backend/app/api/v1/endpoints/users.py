@@ -1,8 +1,10 @@
 """User management endpoints."""
 
+import logging
 from typing import Annotated, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Query
+from redis.exceptions import RedisError
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -23,6 +25,10 @@ from app.models.link import Link
 from app.models.system_setting import SystemSetting
 from app.config import settings
 from app.redis import get_redis
+from app.core.navigation_access import build_group_path
+from app.services.audit import build_field_changes, record_audit_log
+
+logger = logging.getLogger(__name__)
 
 LOGIN_ATTEMPT_PREFIX = "login_attempts:"
 
@@ -34,8 +40,29 @@ class ResetPasswordRequest(BaseModel):
 router = APIRouter()
 
 
+async def _validate_user_group_ids(
+    db: AsyncSession,
+    group_ids: list[UUID],
+) -> list[UUID]:
+    unique_group_ids = list(dict.fromkeys(group_ids))
+    if not unique_group_ids:
+        return []
+
+    stmt = select(UserGroup.id).where(UserGroup.id.in_(unique_group_ids))
+    result = await db.execute(stmt)
+    existing_ids = set(result.scalars().all())
+    missing_ids = [str(gid) for gid in unique_group_ids if gid not in existing_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User group not found: {', '.join(missing_ids)}",
+        )
+    return unique_group_ids
+
+
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
     skip: int = Query(0, ge=0),
@@ -51,8 +78,12 @@ async def list_users(
         limit: Maximum number of records to return
 
     Returns:
-        List of users with lock status
+        List of users with lock status. Total matching count is returned via
+        the X-Total-Count response header so callers can page through results.
     """
+    count_result = await db.execute(select(func.count()).select_from(User))
+    response.headers["X-Total-Count"] = str(count_result.scalar_one())
+
     stmt = (
         select(User)
         .options(selectinload(User.user_groups))
@@ -70,25 +101,37 @@ async def list_users(
     rows = {s.key: s.value for s in settings_result.scalars().all()}
     max_attempts = int(rows.get("max_login_attempts", 3))
 
-    # Check lock status for each user
-    redis = await get_redis()
+    lock_info: dict[str, tuple[int | None, int | None]] = {}
+    try:
+        redis = await get_redis()
+        pipe = redis.pipeline()
+        for user in users:
+            attempt_key = f"{LOGIN_ATTEMPT_PREFIX}{user.username}"
+            pipe.get(attempt_key)
+            pipe.ttl(attempt_key)
+        redis_results = await pipe.execute()
+        for index, user in enumerate(users):
+            attempts = redis_results[index * 2]
+            ttl = redis_results[index * 2 + 1]
+            lock_info[user.username] = (
+                int(attempts) if attempts is not None else None,
+                int(ttl) if ttl is not None else None,
+            )
+    except RedisError:
+        logger.warning("Failed to fetch login lock info from Redis", exc_info=True)
+        lock_info = {}
+
     user_responses = []
     for user in users:
         user_dict = UserResponse.model_validate(user).model_dump()
-
-        # Check if user is locked
-        attempt_key = f"{LOGIN_ATTEMPT_PREFIX}{user.username}"
-        attempts = await redis.get(attempt_key)
-
-        if attempts is not None and int(attempts) >= max_attempts:
+        attempts, ttl = lock_info.get(user.username, (None, None))
+        if attempts is not None and attempts >= max_attempts:
             user_dict["is_locked"] = True
-            ttl = await redis.ttl(attempt_key)
-            if ttl > 0:
+            if ttl and ttl > 0:
                 from datetime import datetime, timedelta, timezone
                 user_dict["locked_until"] = datetime.now(timezone.utc) + timedelta(seconds=ttl)
         else:
             user_dict["is_locked"] = False
-
         user_responses.append(UserResponse(**user_dict))
 
     return user_responses
@@ -97,6 +140,7 @@ async def list_users(
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserResponse:
@@ -114,19 +158,17 @@ async def create_user(
     Raises:
         HTTPException: If username or email already exists
     """
-    # Check if username already exists
-    stmt = select(User).where(User.username == user_data.username)
+    stmt = select(User).where(
+        or_(User.username == user_data.username, User.email == user_data.email)
+    )
     result = await db.execute(stmt)
-    if result.scalar_one_or_none():
+    existing_users = result.scalars().all()
+    if any(user.username == user_data.username for user in existing_users):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered",
         )
-
-    # Check if email already exists
-    stmt = select(User).where(User.email == user_data.email)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
+    if any(user.email == user_data.email for user in existing_users):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
@@ -154,7 +196,9 @@ async def create_user(
     await db.flush()
 
     # Assign user to groups
-    group_ids = list(user_data.user_group_ids) if user_data.user_group_ids else []
+    group_ids = await _validate_user_group_ids(
+        db, list(user_data.user_group_ids) if user_data.user_group_ids else []
+    )
     if not group_ids and not new_user.is_superuser:
         default_group = await db.execute(
             select(UserGroup).where(UserGroup.name == 'default')
@@ -168,6 +212,15 @@ async def create_user(
             [{"user_group_id": gid, "user_id": new_user.id} for gid in group_ids]
         )
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="create",
+        resource_type="user",
+        resource_id=new_user.id,
+        changes={"username": new_user.username, "is_superuser": new_user.is_superuser},
+        request=request,
+    )
     await db.commit()
 
     # Re-fetch with groups loaded
@@ -223,6 +276,7 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserResponse:
@@ -265,22 +319,50 @@ async def update_user(
                 detail="Email already registered",
             )
 
-    # Update user groups if provided
+    original_username = user.username
+    update_data = user_data.model_dump(exclude_unset=True, exclude={"user_group_ids"})
+    current_values = {field: getattr(user, field) for field in update_data}
+    field_changes = build_field_changes(current_values, update_data)
+
+    current_group_ids = sorted(str(group.id) for group in user.user_groups)
+    group_ids: list[UUID] | None = None
     if user_data.user_group_ids is not None:
+        validated_group_ids = await _validate_user_group_ids(db, list(user_data.user_group_ids))
+        new_group_ids = sorted(str(gid) for gid in validated_group_ids)
+        if new_group_ids != current_group_ids:
+            group_ids = validated_group_ids
+            field_changes.append({
+                "field": "user_group_ids",
+                "old_value": current_group_ids,
+                "new_value": new_group_ids,
+            })
+
+    if not field_changes:
+        return UserResponse.model_validate(user)
+
+    if group_ids is not None:
         await db.execute(
             user_group_members.delete().where(user_group_members.c.user_id == user_id)
         )
-        if user_data.user_group_ids:
+        if group_ids:
             await db.execute(
                 user_group_members.insert(),
-                [{"user_group_id": gid, "user_id": user_id} for gid in user_data.user_group_ids]
+                [{"user_group_id": gid, "user_id": user_id} for gid in group_ids]
             )
 
     # Update user fields (immutable pattern)
-    update_data = user_data.model_dump(exclude_unset=True, exclude={"user_group_ids"})
     for field, value in update_data.items():
         setattr(user, field, value)
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.update",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": original_username, "field_changes": field_changes},
+        request=request,
+    )
     await db.commit()
 
     # Re-fetch with groups loaded
@@ -298,6 +380,7 @@ async def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> None:
@@ -328,7 +411,17 @@ async def delete_user(
             detail="User not found",
         )
 
+    deleted_username = user.username
     await db.delete(user)
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.delete",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": deleted_username},
+        request=request,
+    )
     await db.commit()
 
     # Invalidate permissions cache
@@ -339,6 +432,7 @@ async def delete_user(
 async def reset_user_password(
     user_id: UUID,
     body: ResetPasswordRequest,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> dict:
@@ -362,7 +456,26 @@ async def reset_user_password(
         )
 
     user.hashed_password = hash_password(body.new_password)
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.reset_password",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": user.username},
+        request=request,
+    )
     await db.commit()
+
+    try:
+        redis = await get_redis()
+        await redis.delete(f"{LOGIN_ATTEMPT_PREFIX}{user.username}")
+    except RedisError:
+        logger.warning(
+            "Failed to clear login attempt counter after password reset for user %s",
+            user.username,
+            exc_info=True,
+        )
 
     return {"message": "Password reset successfully"}
 
@@ -370,6 +483,7 @@ async def reset_user_password(
 @router.post("/{user_id}/disable", response_model=UserResponse)
 async def disable_user(
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserResponse:
@@ -391,7 +505,17 @@ async def disable_user(
         )
 
     user.is_active = False
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.disable",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": user.username},
+        request=request,
+    )
     await db.commit()
+    await invalidate_user_permissions_cache(user_id)
 
     result = await db.execute(
         select(User).where(User.id == user_id).options(selectinload(User.user_groups))
@@ -402,6 +526,7 @@ async def disable_user(
 @router.post("/{user_id}/enable", response_model=UserResponse)
 async def enable_user(
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserResponse:
@@ -417,6 +542,15 @@ async def enable_user(
         )
 
     user.is_active = True
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.enable",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": user.username},
+        request=request,
+    )
     await db.commit()
 
     result = await db.execute(
@@ -483,29 +617,6 @@ async def get_user_authorized_assets(
     all_groups_result = await db.execute(all_groups_stmt)
     all_groups = {g.id: g for g in all_groups_result.scalars().all()}
 
-    def build_group_path(group_id, groups_map, max_depth=None):
-        """Build full hierarchy path for a navigation group with depth limit and cycle detection."""
-        if group_id is None:
-            return "全部"
-        if max_depth is None:
-            max_depth = settings.MAX_HIERARCHY_DEPTH
-
-        path_parts = []
-        current = groups_map.get(group_id)
-        visited = set()
-        depth = 0
-
-        while current and depth < max_depth:
-            if current.id in visited:
-                # Cycle detected, break to prevent infinite loop
-                break
-            visited.add(current.id)
-            path_parts.insert(0, current.name)
-            current = groups_map.get(current.parent_id) if current.parent_id else None
-            depth += 1
-
-        return "/".join(path_parts) if path_parts else ""
-
     # Nav group permissions directly assigned to this user
     nav_stmt = (
         select(
@@ -566,6 +677,7 @@ async def get_user_authorized_assets(
 @router.post("/{user_id}/unlock")
 async def unlock_user(
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> dict:
@@ -579,5 +691,15 @@ async def unlock_user(
 
     redis = await get_redis()
     await redis.delete(f"{LOGIN_ATTEMPT_PREFIX}{user.username}")
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user.unlock",
+        resource_type="user",
+        resource_id=user_id,
+        changes={"username": user.username},
+        request=request,
+    )
+    await db.commit()
 
     return {"message": "User unlocked successfully"}

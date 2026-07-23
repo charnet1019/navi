@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { favoritesApi } from '@/api/favorites'
+import { withLoading } from '@/utils/withLoading'
 import type { Link } from '@/types'
 
 export const useFavoritesStore = defineStore('favorites', () => {
   const favoriteIds = ref<Set<string>>(new Set())
   const favoriteLinks = ref<Link[]>([])
   const loading = ref(false)
+  const reordering = ref(false)
   const error = ref<string | null>(null)
 
   function isFavorite(linkId: string): boolean {
@@ -14,34 +16,20 @@ export const useFavoritesStore = defineStore('favorites', () => {
   }
 
   async function fetchFavoriteIds(): Promise<void> {
-    try {
-      error.value = null
+    await withLoading(null, error, 'Failed to fetch favorite IDs', async () => {
       const ids = await favoritesApi.listIds()
       favoriteIds.value = new Set(ids)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch favorite IDs'
-      error.value = msg
-      throw err
-    }
+    })
   }
 
   async function fetchFavoriteLinks(): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
+    await withLoading(loading, error, 'Failed to fetch favorites', async () => {
       favoriteLinks.value = await favoritesApi.list()
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch favorites'
-      error.value = msg
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function toggleFavorite(linkId: string): Promise<void> {
-    try {
-      error.value = null
+    await withLoading(null, error, 'Failed to toggle favorite', async () => {
       if (favoriteIds.value.has(linkId)) {
         await favoritesApi.remove(linkId)
         const next = new Set(favoriteIds.value)
@@ -52,33 +40,25 @@ export const useFavoritesStore = defineStore('favorites', () => {
         await favoritesApi.add(linkId)
         favoriteIds.value = new Set([...favoriteIds.value, linkId])
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to toggle favorite'
-      error.value = msg
-      throw err
-    }
+    })
   }
 
   async function reorderFavorites(orderedIds: string[]): Promise<void> {
-    try {
-      error.value = null
-      const items = orderedIds.map((id, index) => ({
-        link_id: id,
-        sort_order: index
-      }))
-      const updated = await favoritesApi.reorder(items)
-      favoriteLinks.value = updated
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to reorder favorites'
-      error.value = msg
-      throw err
-    }
+    if (reordering.value) return
+    const items = orderedIds.map((id, index) => ({
+      link_id: id,
+      sort_order: index
+    }))
+    await withLoading(reordering, error, 'Failed to reorder favorites', async () => {
+      favoriteLinks.value = await favoritesApi.reorder(items)
+    })
   }
 
   return {
     favoriteIds,
     favoriteLinks,
     loading,
+    reordering,
     error,
     isFavorite,
     fetchFavoriteIds,

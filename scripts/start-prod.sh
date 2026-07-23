@@ -45,11 +45,11 @@ sleep 10
 
 # Run database migrations
 echo "Running database migrations..."
-docker-compose run --rm backend alembic upgrade head
+docker-compose run --rm navi-backend alembic upgrade head
 
 # Start backend and frontend
 echo "Starting backend and frontend..."
-docker-compose up -d backend frontend
+docker-compose up -d navi-backend navi-frontend
 
 echo ""
 echo "Production environment started successfully!"

@@ -2,55 +2,31 @@
 
 from typing import Annotated, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy import select, delete, or_, update
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models.user import User
-from app.models.link import Link
-from app.models.associations import user_favorites, NavigationGroupPermission, LinkPermission
-from app.schemas.link import LinkResponse
 from app.api.deps import get_current_active_user
+from app.core.navigation_access import NavigationAccessScope, accessible_link_condition, build_navigation_access_scope
+from app.database import get_db
+from app.models.associations import user_favorites
+from app.models.link import Link
+from app.models.user import User
+from app.schemas.link import LinkResponse
+from app.schemas.reorder import FavoriteReorderItem
+from app.services.audit import record_audit_log
 
 
 router = APIRouter()
 
 
-async def _permitted_group_ids(
-    db: AsyncSession, user: User
-) -> list[UUID] | None:
-    """Return permitted navigation group IDs for a non-superuser.
-
-    Returns None if the user has 'all' access (navigation_group_id IS NULL).
-    Returns a list of specific group UUIDs otherwise.
-    """
-    user_group_ids = [ug.id for ug in user.user_groups]
-    user_filter = [NavigationGroupPermission.user_id == user.id]
-    if user_group_ids:
-        user_filter.append(
-            NavigationGroupPermission.user_group_id.in_(user_group_ids)
-        )
-
-    # Check for "all" permission
-    all_stmt = select(NavigationGroupPermission).where(
-        NavigationGroupPermission.navigation_group_id.is_(None),
-        or_(*user_filter),
+def _can_access_link(scope: NavigationAccessScope, link: Link) -> bool:
+    return (
+        scope.has_all_access
+        or link.navigation_group_id in scope.visible_group_ids
+        or link.id in scope.direct_link_ids
     )
-    result = await db.execute(all_stmt)
-    if result.scalar_one_or_none() is not None:
-        return None  # has access to everything
-
-    # Get specific permitted group IDs
-    ids_stmt = select(
-        NavigationGroupPermission.navigation_group_id
-    ).where(
-        NavigationGroupPermission.navigation_group_id.isnot(None),
-        or_(*user_filter),
-    )
-    result = await db.execute(ids_stmt)
-    return [row[0] for row in result.fetchall()]
 
 
 @router.get("/", response_model=List[LinkResponse])
@@ -59,7 +35,7 @@ async def list_favorites(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> List[LinkResponse]:
     """List current user's favorited links (filtered by permissions)."""
-    base_stmt = (
+    stmt = (
         select(Link)
         .join(user_favorites, user_favorites.c.link_id == Link.id)
         .where(
@@ -69,27 +45,13 @@ async def list_favorites(
     )
 
     if not current_user.is_superuser:
-        permitted = await _permitted_group_ids(db, current_user)
-        if permitted is not None:
-            user_group_ids = [ug.id for ug in current_user.user_groups]
-            link_filter = [LinkPermission.user_id == current_user.id]
-            if user_group_ids:
-                link_filter.append(LinkPermission.user_group_id.in_(user_group_ids))
-            direct_link_ids_stmt = select(
-                LinkPermission.link_id
-            ).where(or_(*link_filter))
+        scope = await build_navigation_access_scope(db, current_user)
+        if not scope.has_all_access:
+            stmt = stmt.where(accessible_link_condition(scope))
 
-            base_stmt = base_stmt.where(
-                or_(
-                    Link.navigation_group_id.in_(permitted),
-                    Link.id.in_(direct_link_ids_stmt),
-                )
-            )
-
-    stmt = base_stmt.order_by(user_favorites.c.sort_order, user_favorites.c.created_at.desc())
+    stmt = stmt.order_by(user_favorites.c.sort_order, user_favorites.c.created_at.desc())
     result = await db.execute(stmt)
-    links = result.scalars().all()
-    return [LinkResponse.model_validate(link) for link in links]
+    return [LinkResponse.model_validate(link) for link in result.scalars().all()]
 
 
 @router.get("/ids", response_model=List[str])
@@ -98,7 +60,7 @@ async def list_favorite_ids(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> List[str]:
     """Return just the link IDs the user has favorited (filtered by permissions)."""
-    base_stmt = (
+    stmt = (
         select(user_favorites.c.link_id)
         .join(Link, user_favorites.c.link_id == Link.id)
         .where(
@@ -108,41 +70,38 @@ async def list_favorite_ids(
     )
 
     if not current_user.is_superuser:
-        permitted = await _permitted_group_ids(db, current_user)
-        if permitted is not None:
-            user_group_ids = [ug.id for ug in current_user.user_groups]
-            link_filter = [LinkPermission.user_id == current_user.id]
-            if user_group_ids:
-                link_filter.append(LinkPermission.user_group_id.in_(user_group_ids))
-            direct_link_ids_stmt = select(
-                LinkPermission.link_id
-            ).where(or_(*link_filter))
+        scope = await build_navigation_access_scope(db, current_user)
+        if not scope.has_all_access:
+            stmt = stmt.where(accessible_link_condition(scope))
 
-            base_stmt = base_stmt.where(
-                or_(
-                    Link.navigation_group_id.in_(permitted),
-                    Link.id.in_(direct_link_ids_stmt),
-                )
-            )
-
-    result = await db.execute(base_stmt)
+    result = await db.execute(stmt)
     return [str(row[0]) for row in result.fetchall()]
 
 
 @router.post("/{link_id}", status_code=status.HTTP_201_CREATED)
 async def add_favorite(
     link_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> dict:
     """Add a link to the current user's favorites."""
-    stmt = select(Link).where(Link.id == link_id)
+    stmt = select(Link).where(Link.id == link_id, Link.is_active == True)
     result = await db.execute(stmt)
-    if result.scalar_one_or_none() is None:
+    link = result.scalar_one_or_none()
+    if link is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Link not found",
         )
+
+    if not current_user.is_superuser:
+        scope = await build_navigation_access_scope(db, current_user)
+        if not _can_access_link(scope, link):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Link not found",
+            )
 
     existing = await db.execute(
         select(user_favorites).where(
@@ -162,6 +121,15 @@ async def add_favorite(
             link_id=link_id,
         )
     )
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="favorite.add",
+        resource_type="favorite",
+        resource_id=link_id,
+        changes={"link_name": link.name},
+        request=request,
+    )
     await db.commit()
 
     return {"message": "Link added to favorites"}
@@ -170,6 +138,7 @@ async def add_favorite(
 @router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
     link_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> None:
@@ -192,22 +161,48 @@ async def remove_favorite(
             user_favorites.c.link_id == link_id,
         )
     )
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="favorite.remove",
+        resource_type="favorite",
+        resource_id=link_id,
+        request=request,
+    )
     await db.commit()
-
-
-class ReorderItem(BaseModel):
-    link_id: UUID
-    sort_order: int
 
 
 @router.put("/reorder", response_model=List[LinkResponse])
 async def reorder_favorites(
-    items: List[ReorderItem],
+    items: List[FavoriteReorderItem],
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> List[LinkResponse]:
     """Batch update sort order for user's favorite links."""
-    # Update sort_order for each favorite
+    if not items:
+        return await list_favorites(db, current_user)
+
+    requested_ids = [item.link_id for item in items]
+    if len(set(requested_ids)) != len(requested_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Duplicate link_id in reorder request",
+        )
+    existing_result = await db.execute(
+        select(user_favorites.c.link_id).where(
+            user_favorites.c.user_id == current_user.id,
+            user_favorites.c.link_id.in_(requested_ids),
+        )
+    )
+    existing_ids = set(existing_result.scalars().all())
+    missing_ids = [str(link_id) for link_id in requested_ids if link_id not in existing_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Favorite not found: {', '.join(missing_ids)}",
+        )
+
     for item in items:
         await db.execute(
             update(user_favorites)
@@ -218,7 +213,18 @@ async def reorder_favorites(
             .values(sort_order=item.sort_order)
         )
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="favorite.reorder",
+        resource_type="favorite",
+        changes={
+            "items": [
+                {"link_id": str(item.link_id), "sort_order": item.sort_order}
+                for item in items
+            ],
+        },
+        request=request,
+    )
     await db.commit()
-
-    # Return updated favorites list
     return await list_favorites(db, current_user)

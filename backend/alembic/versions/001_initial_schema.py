@@ -312,16 +312,24 @@ def upgrade() -> None:
         }
     )
 
-    # Insert default system setting
-    conn.execute(
-        sa.text("""
-            INSERT INTO system_settings (id, key, value, description, updated_at)
-            VALUES (:id, 'links_per_row', '5', 'Number of links to display per row', now())
-        """),
-        {
-            'id': str(uuid.uuid4())
-        }
-    )
+    # Insert default system settings
+    default_settings = [
+        ('links_per_row', '5', 'Number of links to display per row'),
+        ('audit_log_retention_days', '30', 'Number of days to retain audit logs'),
+    ]
+    for key, value, description in default_settings:
+        conn.execute(
+            sa.text("""
+                INSERT INTO system_settings (id, key, value, description, updated_at)
+                VALUES (:id, :key, :value, :description, now())
+            """),
+            {
+                'id': str(uuid.uuid4()),
+                'key': key,
+                'value': value,
+                'description': description,
+            }
+        )
 
 
 def downgrade() -> None:

@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     uploads,
     settings,
     favorites,
+    audit_logs,
 )
 
 
@@ -87,4 +88,11 @@ api_router.include_router(
     favorites.router,
     prefix="/favorites",
     tags=["Favorites"],
+)
+
+# Mount audit log endpoints (read-only)
+api_router.include_router(
+    audit_logs.router,
+    prefix="/audit-logs",
+    tags=["Audit Logs"],
 )

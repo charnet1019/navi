@@ -45,13 +45,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string
-  refresh_token: string
-  token_type: string
-}
-
-export interface TokenRefreshRequest {
-  refresh_token: string
+  message: string
 }
 
 export interface ChangePasswordRequest {
@@ -235,4 +229,18 @@ export interface LinkAsset {
 export interface AuthorizedAssets {
   nav_group_permissions: NavGroupAsset[]
   link_permissions: LinkAsset[]
+}
+
+// Audit log types
+export interface AuditLog {
+  id: string
+  user_id: string | null
+  username: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  changes: Record<string, unknown> | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
 }

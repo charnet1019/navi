@@ -7,7 +7,7 @@ from app.schemas.user import (
 )
 from app.schemas.auth import (
     LoginRequest,
-    TokenResponse,
+    AuthResponse,
     PasswordChangeRequest,
 )
 from app.schemas.role import (
@@ -56,7 +56,7 @@ __all__ = [
     "UserUpdate",
     "UserResponse",
     "LoginRequest",
-    "TokenResponse",
+    "AuthResponse",
     "PasswordChangeRequest",
     "RoleBase",
     "RoleCreate",

@@ -195,7 +195,12 @@ Configuration is managed through environment variables and the `app/core/config.
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime
 - `REFRESH_TOKEN_EXPIRE_DAYS`: Refresh token lifetime
 - `DEBUG`: Enable debug mode
-- `CORS_ORIGINS`: Allowed CORS origins
+- `CORS_ORIGINS`: Allowed CORS origins, default `*`
+- `CORS_ALLOW_CREDENTIALS`: Allow credentialed CORS requests when `CORS_ORIGINS` is not `*`
+- `AUTH_COOKIE_SECURE`: Set auth cookies as Secure; use `true` on HTTPS production
+- `AUTH_COOKIE_SAMESITE`: Auth cookie SameSite policy; default `lax`
+- `AUTH_COOKIE_DOMAIN`: Optional cookie domain for shared subdomains
+- `AUTH_CSRF_COOKIE_NAME` / `AUTH_CSRF_HEADER_NAME`: CSRF double-submit cookie/header names
 - `LOG_LEVEL`: Logging level
 
 ## Security

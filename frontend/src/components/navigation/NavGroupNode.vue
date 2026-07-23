@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { FolderOutlined, RightOutlined } from '@ant-design/icons-vue'
 import draggable from 'vuedraggable'
 import { useNavigationStore } from '@/stores/navigation'
@@ -111,8 +112,14 @@ const nestGroup = { name: 'nav-groups', pull: false, put: nestGroupPut }
 watch(() => props.group.children, (newChildren) => {
   if (!isDragging.value) {
     localChildren.value = [...(newChildren ?? [])]
+    open.value = isSelectedPath(props.group, props.selectedId)
   }
 })
+
+function isSelectedPath(group: NavigationGroup, id: string | null | undefined): boolean {
+  if (!id) return false
+  return group.id === id || isDescendantSelected(group, id)
+}
 
 function isDescendantSelected(group: NavigationGroup, id: string | null | undefined): boolean {
   if (!id) return false
@@ -131,10 +138,10 @@ function isDescendantOf(targetId: string, possibleAncestorId: string): boolean {
   return false
 }
 
-const open = ref(isDescendantSelected(props.group, props.selectedId))
+const open = ref(isSelectedPath(props.group, props.selectedId))
 
 watch(() => props.selectedId, (id) => {
-  if (isDescendantSelected(props.group, id)) open.value = true
+  open.value = isSelectedPath(props.group, id)
 })
 
 const handleClick = () => {
@@ -167,6 +174,7 @@ const onChildChange = async (evt: DragChangeEvent) => {
     try {
       await navigationStore.reorderGroups(localChildren.value.map(c => c.id))
     } catch {
+      message.error('排序失败')
       localChildren.value = [...(props.group.children ?? [])]
     }
   } else if (evt.added) {
@@ -180,6 +188,7 @@ const onChildChange = async (evt: DragChangeEvent) => {
       await navigationStore.updateGroup(movedId, { parent_id: props.group.id })
       await navigationStore.reorderGroups(orderedIds)
     } catch {
+      message.error('移动分组失败')
       await navigationStore.fetchGroups()
     }
   }
@@ -200,6 +209,7 @@ const onNestAdd = async (evt: { newIndex: number }) => {
     await navigationStore.updateGroup(moved.id, { parent_id: props.group.id })
     await navigationStore.fetchGroups()
   } catch {
+    message.error('移动分组失败')
     await navigationStore.fetchGroups()
   }
 }

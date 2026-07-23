@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import draggable from 'vuedraggable'
 import NavGroupNode from './NavGroupNode.vue'
@@ -101,6 +102,7 @@ const onChange = async (evt: DragChangeEvent) => {
     try {
       await navigationStore.reorderGroups(localGroups.value.map(g => g.id))
     } catch {
+      message.error('排序失败')
       localGroups.value = [...props.groups]
     }
   } else if (evt.added) {
@@ -110,6 +112,7 @@ const onChange = async (evt: DragChangeEvent) => {
       await navigationStore.updateGroup(movedId, { parent_id: null })
       await navigationStore.reorderGroups(orderedIds)
     } catch {
+      message.error('移动分组失败')
       await navigationStore.fetchGroups()
     }
   }

@@ -78,7 +78,7 @@ watch(() => props.initialValues, (newValues) => {
     formState.name = newValues.name || ''
     formState.description = newValues.description || ''
   }
-}, { deep: true })
+})
 
 const handleSubmit = () => {
   const values: CreateUserGroupRequest | UpdateUserGroupRequest = {

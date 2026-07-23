@@ -31,10 +31,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { PlusOutlined, LoadingOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import { uploadsApi } from '@/api/uploads'
+import { useImageUpload } from '@/composables/useImageUpload'
 
 interface Props {
   modelValue?: string
@@ -47,78 +45,12 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const uploading = ref(false)
-const savedUrl = ref(props.modelValue || '')
-const pendingUrl = ref('')
-
-const imageUrl = computed(() => props.modelValue || '')
-
-// Sync savedUrl when parent sets value from DB (not from our own upload)
-watch(() => props.modelValue, (newVal) => {
-  const val = newVal || ''
-  if (val !== pendingUrl.value) {
-    savedUrl.value = val
-  }
-})
-
-const handleBeforeUpload = async (file: File) => {
-  const isValidType = /\.(png|jpe?g|gif|webp|ico|bmp|tiff?|avif|jfif)$/i.test(file.name)
-  if (!isValidType) {
-    message.error('仅支持 PNG、JPG、GIF、WebP、ICO、BMP、TIFF、AVIF、JFIF 格式的图片')
-    return false
-  }
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error('图片大小不能超过 10MB')
-    return false
-  }
-
-  uploading.value = true
-  try {
-    if (pendingUrl.value) {
-      try { await uploadsApi.deleteImage(pendingUrl.value) } catch { /* ignore */ }
-    }
-    const res = await uploadsApi.uploadImage(file)
-    pendingUrl.value = res.url
-    emit('update:modelValue', res.url)
-  } catch {
-    message.error('上传失败')
-  } finally {
-    uploading.value = false
-  }
-  return false
-}
-
-const handleClear = async () => {
-  const current = props.modelValue || ''
-  if (current === pendingUrl.value && pendingUrl.value) {
-    try { await uploadsApi.deleteImage(pendingUrl.value) } catch { /* ignore */ }
-    pendingUrl.value = ''
-  }
-  emit('update:modelValue', '')
-}
-
-const commit = () => {
-  const currentUrl = props.modelValue || ''
-  const oldSavedUrl = savedUrl.value
-  // Delete old saved file if value changed (replaced or cleared)
-  if (oldSavedUrl && oldSavedUrl !== currentUrl) {
-    uploadsApi.deleteImage(oldSavedUrl).catch(() => { /* ignore */ })
-  }
-  savedUrl.value = currentUrl
-  pendingUrl.value = ''
-}
-
-const cleanup = async () => {
-  if (pendingUrl.value && pendingUrl.value !== savedUrl.value) {
-    try { await uploadsApi.deleteImage(pendingUrl.value) } catch { /* ignore */ }
-    pendingUrl.value = ''
-    emit('update:modelValue', savedUrl.value)
-  }
-}
-
-onBeforeUnmount(() => {
-  cleanup()
+const { uploading, imageUrl, handleBeforeUpload, handleClear, commit, cleanup } = useImageUpload({
+  getModelValue: () => props.modelValue,
+  emitValue: value => emit('update:modelValue', value),
+  allowedPattern: /\.(png|jpe?g|gif|webp|ico|bmp|tiff?|avif|jfif)$/i,
+  allowedMessage: '仅支持 PNG、JPG、GIF、WebP、ICO、BMP、TIFF、AVIF、JFIF 格式的图片',
+  maxSizeMB: 10
 })
 
 defineExpose({ commit, cleanup })

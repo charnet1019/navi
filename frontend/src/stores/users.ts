@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { usersApi } from '@/api/users'
+import { withLoading } from '@/utils/withLoading'
 import type { User, CreateUserRequest, UpdateUserRequest, ResetPasswordRequest } from '@/types'
 
 export const useUsersStore = defineStore('users', () => {
   const users = ref<User[]>([])
+  const total = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -13,114 +15,63 @@ export const useUsersStore = defineStore('users', () => {
     limit?: number
     is_active?: boolean
   }): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
-      users.value = await usersApi.list(params)
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch users'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    await withLoading(loading, error, 'Failed to fetch users', async () => {
+      const result = await usersApi.list(params)
+      users.value = result.users
+      total.value = result.total
+    })
   }
 
   async function createUser(data: CreateUserRequest): Promise<User> {
-    try {
-      loading.value = true
-      error.value = null
+    return withLoading(loading, error, 'Failed to create user', async () => {
       const newUser = await usersApi.create(data)
       users.value = [...users.value, newUser]
+      total.value += 1
       return newUser
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create user'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function updateUser(id: string, data: UpdateUserRequest): Promise<User> {
-    try {
-      loading.value = true
-      error.value = null
+    return withLoading(loading, error, 'Failed to update user', async () => {
       const updatedUser = await usersApi.update(id, data)
       users.value = users.value.map(u => u.id === id ? updatedUser : u)
       return updatedUser
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update user'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function deleteUser(id: string): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
+    await withLoading(loading, error, 'Failed to delete user', async () => {
       await usersApi.delete(id)
       users.value = users.value.filter(u => u.id !== id)
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete user'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+      total.value = Math.max(0, total.value - 1)
+    })
   }
 
   async function resetPassword(id: string, data: ResetPasswordRequest): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
+    await withLoading(loading, error, 'Failed to reset password', async () => {
       await usersApi.resetPassword(id, data)
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to reset password'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function disableUser(id: string): Promise<User> {
-    try {
-      loading.value = true
-      error.value = null
+    return withLoading(loading, error, 'Failed to disable user', async () => {
       const updatedUser = await usersApi.disable(id)
       users.value = users.value.map(u => u.id === id ? updatedUser : u)
       return updatedUser
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to disable user'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function enableUser(id: string): Promise<User> {
-    try {
-      loading.value = true
-      error.value = null
+    return withLoading(loading, error, 'Failed to enable user', async () => {
       const updatedUser = await usersApi.enable(id)
       users.value = users.value.map(u => u.id === id ? updatedUser : u)
       return updatedUser
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to enable user'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   return {
     users,
+    total,
     loading,
     error,
     fetchUsers,

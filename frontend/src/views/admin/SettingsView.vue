@@ -103,6 +103,26 @@
           </a-form>
         </a-card>
 
+        <a-card title="审计日志" style="margin-top: 24px">
+          <a-form layout="vertical">
+            <a-form-item label="日志保留时间（天）">
+              <a-input-number
+                v-model:value="formState.audit_log_retention_days"
+                :min="1"
+                :max="3650"
+                style="width: 200px"
+              />
+              <div class="field-hint">系统仅保留最近指定天数的审计日志，默认 30 天</div>
+            </a-form-item>
+
+            <a-form-item>
+              <a-button type="primary" :loading="saving" @click="handleSave">
+                保存
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-card>
+
         <a-card title="密码规则" style="margin-top: 24px">
           <a-form layout="vertical">
             <a-form-item label="密码最小长度">
@@ -166,6 +186,7 @@ const formState = reactive({
   icp_link: '',
   max_login_attempts: 3,
   login_lockout_minutes: 30,
+  audit_log_retention_days: 30,
   password_min_length: 6,
   password_require_uppercase: true,
   password_require_lowercase: true,
@@ -186,6 +207,7 @@ onMounted(async () => {
     formState.icp_link = settingsStore.icpLink
     formState.max_login_attempts = settingsStore.maxLoginAttempts
     formState.login_lockout_minutes = settingsStore.loginLockoutMinutes
+    formState.audit_log_retention_days = settingsStore.auditLogRetentionDays
     formState.password_min_length = settingsStore.passwordMinLength
     formState.password_require_uppercase = settingsStore.passwordRequireUppercase
     formState.password_require_lowercase = settingsStore.passwordRequireLowercase
@@ -221,6 +243,7 @@ const handleSave = async () => {
       settingsStore.updateSetting('icp_link', { value: formState.icp_link }),
       settingsStore.updateSetting('max_login_attempts', { value: String(formState.max_login_attempts) }),
       settingsStore.updateSetting('login_lockout_minutes', { value: String(formState.login_lockout_minutes) }),
+      settingsStore.updateSetting('audit_log_retention_days', { value: String(formState.audit_log_retention_days) }),
       settingsStore.updateSetting('password_min_length', { value: String(formState.password_min_length) }),
       settingsStore.updateSetting('password_require_uppercase', { value: String(formState.password_require_uppercase) }),
       settingsStore.updateSetting('password_require_lowercase', { value: String(formState.password_require_lowercase) }),

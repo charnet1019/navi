@@ -2,7 +2,7 @@
 
 from typing import Annotated, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,6 +22,8 @@ from app.schemas.user_group import (
 from app.api.deps import require_superuser
 from app.config import settings
 from app.core.permissions import invalidate_user_permissions_cache
+from app.core.navigation_access import build_group_path
+from app.services.audit import build_field_changes, record_audit_log
 
 
 router = APIRouter()
@@ -61,6 +63,7 @@ async def list_user_groups(
 @router.post("/", response_model=UserGroupResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_group(
     group_data: UserGroupCreate,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserGroupResponse:
@@ -94,6 +97,16 @@ async def create_user_group(
     )
 
     db.add(new_group)
+    await db.flush()
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user_group.create",
+        resource_type="user_group",
+        resource_id=new_group.id,
+        changes={"name": new_group.name, "description": new_group.description},
+        request=request,
+    )
     await db.commit()
     await db.refresh(new_group)
 
@@ -141,6 +154,7 @@ async def get_user_group(
 async def update_user_group(
     group_id: UUID,
     group_data: UserGroupUpdate,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserGroupResponse:
@@ -179,11 +193,28 @@ async def update_user_group(
                 detail="User group name already exists",
             )
 
+    original_group_name = group.name
     # Update group fields
     update_data = group_data.model_dump(exclude_unset=True)
+    field_changes = build_field_changes(
+        {"name": group.name, "description": group.description},
+        update_data,
+    )
+    if not field_changes:
+        return UserGroupResponse.model_validate(group)
+
     for field, value in update_data.items():
         setattr(group, field, value)
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user_group.update",
+        resource_type="user_group",
+        resource_id=group_id,
+        changes={"group_name": original_group_name, "field_changes": field_changes},
+        request=request,
+    )
     await db.commit()
     await db.refresh(group)
 
@@ -193,6 +224,7 @@ async def update_user_group(
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_group(
     group_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> None:
@@ -225,7 +257,21 @@ async def delete_user_group(
     for member in group.members:
         await invalidate_user_permissions_cache(member.id)
 
+    deleted_group = {
+        "name": group.name,
+        "description": group.description,
+        "member_ids": [str(member.id) for member in group.members],
+    }
     await db.delete(group)
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user_group.delete",
+        resource_type="user_group",
+        resource_id=group_id,
+        changes=deleted_group,
+        request=request,
+    )
     await db.commit()
 
 
@@ -233,6 +279,7 @@ async def delete_user_group(
 async def add_user_to_group(
     group_id: UUID,
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserGroupWithMembers:
@@ -287,6 +334,19 @@ async def add_user_to_group(
     # Add user to group
     group.members.append(user)
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user_group.member_add",
+        resource_type="user_group",
+        resource_id=group_id,
+        changes={
+            "group_name": group.name,
+            "member_user_id": str(user_id),
+            "member_username": user.username,
+        },
+        request=request,
+    )
     await db.commit()
     await db.refresh(group)
 
@@ -300,6 +360,7 @@ async def add_user_to_group(
 async def remove_user_from_group(
     group_id: UUID,
     user_id: UUID,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_superuser)],
 ) -> UserGroupWithMembers:
@@ -349,6 +410,19 @@ async def remove_user_from_group(
     # Remove user from group
     group.members.remove(user_to_remove)
 
+    await record_audit_log(
+        db,
+        user_id=current_user.id,
+        action="user_group.member_remove",
+        resource_type="user_group",
+        resource_id=group_id,
+        changes={
+            "group_name": group.name,
+            "member_user_id": str(user_id),
+            "member_username": user_to_remove.username,
+        },
+        request=request,
+    )
     await db.commit()
     await db.refresh(group)
 
@@ -377,29 +451,6 @@ async def get_user_group_authorized_assets(
     all_groups_stmt = select(NavigationGroup).limit(settings.MAX_NAVIGATION_GROUPS)
     all_groups_result = await db.execute(all_groups_stmt)
     all_groups = {g.id: g for g in all_groups_result.scalars().all()}
-
-    def build_group_path(group_id, groups_map, max_depth=None):
-        """Build full hierarchy path for a navigation group with depth limit and cycle detection."""
-        if group_id is None:
-            return "全部"
-        if max_depth is None:
-            max_depth = settings.MAX_HIERARCHY_DEPTH
-
-        path_parts = []
-        current = groups_map.get(group_id)
-        visited = set()
-        depth = 0
-
-        while current and depth < max_depth:
-            if current.id in visited:
-                # Cycle detected, break to prevent infinite loop
-                break
-            visited.add(current.id)
-            path_parts.insert(0, current.name)
-            current = groups_map.get(current.parent_id) if current.parent_id else None
-            depth += 1
-
-        return "/".join(path_parts) if path_parts else ""
 
     # Nav group permissions assigned to this user group
     nav_stmt = (

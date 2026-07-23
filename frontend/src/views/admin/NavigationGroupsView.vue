@@ -55,10 +55,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import { confirmAction } from '@/utils/confirm'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import NavigationGroupForm from '@/components/navigation/NavigationGroupForm.vue'
 import { useNavigationStore } from '@/stores/navigation'
+import { buildNavigationTree } from '@/utils/navigationTree'
 import type { NavigationGroup, CreateNavigationGroupRequest, UpdateNavigationGroupRequest } from '@/types'
 
 const navigationStore = useNavigationStore()
@@ -73,29 +75,7 @@ const modalTitle = computed(() => {
   return '创建顶级分组'
 })
 
-// Build tree from flat groups for the table
-function buildTree(flat: NavigationGroup[]): NavigationGroup[] {
-  const map = new Map<string, NavigationGroup & { children: NavigationGroup[] }>()
-  const roots: (NavigationGroup & { children: NavigationGroup[] })[] = []
-  flat.forEach(g => map.set(g.id, { ...g, children: [] }))
-  map.forEach(g => {
-    if (g.parent_id && map.has(g.parent_id)) {
-      map.get(g.parent_id)!.children.push(g)
-    } else {
-      roots.push(g)
-    }
-  })
-  // Remove empty children arrays so a-table doesn't show expand icon for leaf nodes
-  function clean(nodes: (NavigationGroup & { children: NavigationGroup[] })[]): NavigationGroup[] {
-    return nodes.map(n => ({
-      ...n,
-      children: n.children.length ? clean(n.children as (NavigationGroup & { children: NavigationGroup[] })[]) : undefined
-    }))
-  }
-  return clean(roots).sort((a, b) => a.sort_order - b.sort_order)
-}
-
-const treeData = computed(() => buildTree(navigationStore.groups))
+const treeData = computed(() => buildNavigationTree(navigationStore.groups, { omitEmptyChildren: true }))
 
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
@@ -153,11 +133,11 @@ const handleModalCancel = () => {
 }
 
 const handleDelete = (group: NavigationGroup) => {
-  Modal.confirm({
+  confirmAction({
     title: '删除导航分组',
     content: `确定要删除"${group.name}"吗？该分组下的所有链接也将受到影响。`,
     okText: '删除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await navigationStore.deleteGroup(group.id)

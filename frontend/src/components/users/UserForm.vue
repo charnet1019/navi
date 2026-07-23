@@ -152,7 +152,7 @@ watch(() => props.initialValues, (newValues) => {
     formState.is_superuser = newValues.is_superuser ?? false
     formState.user_group_ids = newValues.user_groups?.map(g => g.id) || []
   }
-}, { deep: true })
+})
 
 const handleSubmit = () => {
   if (isEdit.value) {

@@ -51,7 +51,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import { confirmAction } from '@/utils/confirm'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import UserGroupTable from '@/components/user-groups/UserGroupTable.vue'
 import UserGroupModal from '@/components/user-groups/UserGroupModal.vue'
@@ -122,11 +123,11 @@ const handleModalCancel = () => {
 }
 
 const handleDelete = (group: UserGroup) => {
-  Modal.confirm({
+  confirmAction({
     title: '删除用户组',
     content: `确定要删除用户组"${group.name}"吗？此操作不可撤销。`,
     okText: '删除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await userGroupsStore.deleteUserGroup(group.id)
@@ -162,11 +163,11 @@ const handleAddMember = async (userId: string) => {
 const handleRemoveMember = async (userId: string) => {
   if (!selectedGroup.value) return
 
-  Modal.confirm({
+  confirmAction({
     title: '移除成员',
     content: '确定要将该成员从用户组中移除吗？',
     okText: '移除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await userGroupsStore.removeMember(selectedGroup.value!.id, userId)

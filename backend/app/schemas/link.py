@@ -2,8 +2,19 @@
 
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 from uuid import UUID
-from pydantic import BaseModel, Field, HttpUrl
+
+from pydantic import BaseModel, Field, field_validator
+
+
+def validate_link_url(value: str) -> str:
+    """Allow only HTTP(S) URLs for rendered link anchors."""
+    url = value.strip()
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("URL must be a valid http:// or https:// address")
+    return url
 
 
 class LinkBase(BaseModel):
@@ -16,6 +27,11 @@ class LinkBase(BaseModel):
     sort_order: int = Field(default=0, ge=0)
     is_active: bool = True
     open_in_new_tab: bool = True
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        return validate_link_url(value)
 
 
 class LinkCreate(LinkBase):
@@ -33,6 +49,11 @@ class LinkUpdate(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0)
     is_active: Optional[bool] = None
     open_in_new_tab: Optional[bool] = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str | None) -> str | None:
+        return validate_link_url(value) if value is not None else value
 
 
 class LinkResponse(BaseModel):

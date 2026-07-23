@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: navi-frontend
   namespace: navi
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: frontend
+      app: navi-frontend
   template:
     metadata:
       labels:
-        app: frontend
+        app: navi-frontend
     spec:
       containers:
-        - name: frontend
+        - name: navi-frontend
           image: your-registry/navi-frontend:latest
           ports:
             - containerPort: 8080
@@ -40,11 +40,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: navi-frontend
   namespace: navi
 spec:
   selector:
-    app: frontend
+    app: navi-frontend
   ports:
     - port: 80
       targetPort: 8080

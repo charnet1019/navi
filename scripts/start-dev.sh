@@ -40,7 +40,7 @@ docker compose -f docker-compose.dev.yml exec -T postgres psql -U navi -d navi -
 
 # Start backend and frontend
 echo "Starting backend and frontend..."
-docker compose -f docker-compose.dev.yml up -d backend frontend
+docker compose -f docker-compose.dev.yml up -d navi-backend navi-frontend
 
 echo ""
 echo "Development environment started successfully!"

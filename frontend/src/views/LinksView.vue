@@ -65,7 +65,7 @@ watch(selectedGroupFilter, fetchFilteredLinks)
 onMounted(async () => {
   try {
     await Promise.all([
-      navigationStore.fetchGroups(),
+      navigationStore.ensureGroups({ is_active: true }),
       fetchFilteredLinks(),
       settingsStore.fetchPublicSettings()
     ])

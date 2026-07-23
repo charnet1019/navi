@@ -1,8 +1,8 @@
 import apiClient from './client'
+import type { AuthAwareRequestConfig } from './client'
 import type {
   LoginRequest,
   LoginResponse,
-  TokenRefreshRequest,
   User,
   ChangePasswordRequest
 } from '@/types'
@@ -13,17 +13,20 @@ export const authApi = {
     return response.data
   },
 
-  async refresh(data: TokenRefreshRequest): Promise<LoginResponse> {
-    const response = await apiClient.post<LoginResponse>('/auth/refresh', data)
+  async refresh(): Promise<LoginResponse> {
+    const response = await apiClient.post<LoginResponse>('/auth/refresh')
     return response.data
   },
 
-  async logout(refreshToken: string): Promise<void> {
-    await apiClient.post('/auth/logout', { refresh_token: refreshToken })
+  async logout(): Promise<void> {
+    await apiClient.post('/auth/logout')
   },
 
-  async getMe(): Promise<User> {
-    const response = await apiClient.get<User>('/auth/me')
+  async getMe(options: { skipAuthRefresh?: boolean } = {}): Promise<User> {
+    const config = options.skipAuthRefresh
+      ? ({ _skipAuthRefresh: true } as AuthAwareRequestConfig)
+      : undefined
+    const response = await apiClient.get<User>('/auth/me', config)
     return response.data
   },
 

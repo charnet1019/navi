@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { settingsApi, type Setting, type UpdateSettingRequest } from '@/api/settings'
+import { withLoading } from '@/utils/withLoading'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -70,6 +71,11 @@ export const useSettingsStore = defineStore('settings', () => {
     return setting ? parseInt(setting.value, 10) : 30
   })
 
+  const auditLogRetentionDays = computed(() => {
+    const setting = settingsMap.value['audit_log_retention_days']
+    return setting ? parseInt(setting.value, 10) : 30
+  })
+
   const passwordMinLength = computed(() => {
     const setting = settingsMap.value['password_min_length']
     return setting ? parseInt(setting.value, 10) : 6
@@ -97,50 +103,26 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Actions
   async function fetchPublicSettings(): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
+    await withLoading(loading, error, 'Failed to fetch public settings', async () => {
       settings.value = await settingsApi.listPublic()
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch public settings'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function fetchSettings(): Promise<void> {
-    try {
-      loading.value = true
-      error.value = null
+    await withLoading(loading, error, 'Failed to fetch settings', async () => {
       settings.value = await settingsApi.list()
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch settings'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   async function updateSetting(key: string, data: UpdateSettingRequest): Promise<Setting> {
-    try {
-      loading.value = true
-      error.value = null
+    return withLoading(loading, error, 'Failed to update setting', async () => {
       const updatedSetting = await settingsApi.update(key, data)
       const exists = settings.value.some(s => s.key === key)
       settings.value = exists
         ? settings.value.map(s => s.key === key ? updatedSetting : s)
         : [...settings.value, updatedSetting]
       return updatedSetting
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update setting'
-      error.value = errorMessage
-      throw err
-    } finally {
-      loading.value = false
-    }
+    })
   }
 
   return {
@@ -155,6 +137,7 @@ export const useSettingsStore = defineStore('settings', () => {
     icpLink,
     maxLoginAttempts,
     loginLockoutMinutes,
+    auditLogRetentionDays,
     passwordMinLength,
     passwordRequireUppercase,
     passwordRequireLowercase,

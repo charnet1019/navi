@@ -1,5 +1,6 @@
 """Security utilities for password hashing and JWT token management."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 import bcrypt
@@ -7,6 +8,8 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class TokenPayload(BaseModel):
@@ -55,7 +58,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         password_bytes = plain_password.encode('utf-8')
         hashed_bytes = hashed_password.encode('utf-8')
         return bcrypt.checkpw(password_bytes, hashed_bytes)
-    except Exception:
+    except (ValueError, TypeError):
+        # Malformed hash (e.g. legacy/corrupted data) - treat as no match.
+        logger.warning("Password verification failed due to malformed hash", exc_info=True)
         return False
 
 

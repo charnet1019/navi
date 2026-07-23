@@ -9,11 +9,9 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
-class TokenResponse(BaseModel):
-    """Token response schema."""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
+class AuthResponse(BaseModel):
+    """Authentication response without exposing JWTs to JavaScript."""
+    message: str = "ok"
 
 
 class PasswordChangeRequest(BaseModel):

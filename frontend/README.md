@@ -321,6 +321,8 @@ docker build -t navi-frontend .
 ### Environment Variables
 Configure via `.env` file:
 - `VITE_API_BASE_URL`: Backend API base URL
+- `VITE_CSRF_COOKIE_NAME`: CSRF cookie name, must match backend `AUTH_CSRF_COOKIE_NAME`
+- `VITE_CSRF_HEADER_NAME`: CSRF request header name, must match backend `AUTH_CSRF_HEADER_NAME`
 
 ## Browser Support
 

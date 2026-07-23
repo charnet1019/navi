@@ -66,7 +66,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import { confirmAction } from '@/utils/confirm'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LinkTable from '@/components/admin/LinkTable.vue'
 import LinkModal from '@/components/admin/LinkModal.vue'
@@ -128,11 +129,11 @@ const handleModalCancel = () => {
 }
 
 const handleDelete = (link: Link) => {
-  Modal.confirm({
+  confirmAction({
     title: '删除链接',
     content: `确定要删除链接 "${link.name}" 吗？此操作不可撤销。`,
     okText: '删除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await linksStore.deleteLink(link.id)

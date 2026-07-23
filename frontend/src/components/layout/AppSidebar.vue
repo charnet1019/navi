@@ -1,6 +1,6 @@
 <template>
   <a-layout-sider v-model:collapsed="collapsed" collapsible class="app-sidebar">
-    <div class="sidebar-content">
+    <div ref="sidebarContentRef" class="sidebar-content" @scroll="rememberSidebarScroll()">
       <a-menu
         v-model:selectedKeys="mainMenuKeys"
         mode="inline"
@@ -43,6 +43,7 @@
           <a-menu-item key="admin-nav-groups">导航分组</a-menu-item>
           <a-menu-item key="admin-authorization">权限管理</a-menu-item>
           <a-menu-item key="admin-settings">系统设置</a-menu-item>
+          <a-menu-item key="admin-audit-logs">审计日志</a-menu-item>
         </a-sub-menu>
       </a-menu>
     </div>
@@ -50,8 +51,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouter, useRoute, type RouteLocationRaw } from 'vue-router'
 import { HomeOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -64,12 +65,15 @@ const authStore = useAuthStore()
 const navigationStore = useNavigationStore()
 
 const collapsed = ref(false)
+const sidebarContentRef = ref<HTMLElement | null>(null)
 const mainMenuKeys = ref<string[]>([])
 const adminMenuKeys = ref<string[]>([])
 const adminOpenKeys = ref<string[]>([])
+const SIDEBAR_SCROLL_STORAGE_KEY = 'navi:sidebar-scroll-top'
+const isSidebarScrollLocked = ref(false)
 
 function syncSelectionFromRoute(name: string) {
-  const adminRoutes = ['admin-users', 'admin-user-groups', 'admin-nav-groups', 'admin-authorization', 'admin-settings']
+  const adminRoutes = ['admin-users', 'admin-user-groups', 'admin-nav-groups', 'admin-authorization', 'admin-settings', 'admin-audit-logs']
   if (adminRoutes.includes(name)) {
     adminMenuKeys.value = [name]
     adminOpenKeys.value = ['admin']
@@ -91,36 +95,90 @@ watch(() => route.name, (newName) => {
 })
 
 onMounted(async () => {
+  await restoreStoredSidebarScroll()
+
   try {
-    await navigationStore.fetchGroups({ is_active: true })
+    await navigationStore.ensureGroups({ is_active: true })
     const groupId = route.query.group as string | undefined
     if (groupId) {
       navigationStore.selectGroup(groupId)
     }
   } catch (error) {
     message.error('加载导航分组失败')
+  } finally {
+    await restoreStoredSidebarScroll()
+    isSidebarScrollLocked.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  rememberSidebarScroll()
 })
 
 const handleMainMenuClick = ({ key }: { key: string }) => {
   adminMenuKeys.value = []
   navigationStore.selectGroup(null)
-  router.push({ name: key })
+  navigateWithSidebarScrollPreserved({ name: key })
 }
 
 const handleGroupSelect = (groupId: string) => {
   mainMenuKeys.value = []
   adminMenuKeys.value = []
   navigationStore.selectGroup(groupId)
-  router.push({ name: 'home', query: { group: groupId } })
+  navigateWithSidebarScrollPreserved({ name: 'home', query: { group: groupId } })
 }
 
 const handleAdminMenuClick = ({ key }: { key: string }) => {
   mainMenuKeys.value = []
   navigationStore.selectGroup(null)
-  router.push({ name: key })
+  navigateWithSidebarScrollPreserved({ name: key })
 }
 
+
+async function navigateWithSidebarScrollPreserved(location: RouteLocationRaw) {
+  preserveSidebarScrollForNavigation()
+
+  try {
+    await router.push(location)
+  } finally {
+    await restoreStoredSidebarScroll()
+    isSidebarScrollLocked.value = false
+  }
+}
+
+function preserveSidebarScrollForNavigation() {
+  isSidebarScrollLocked.value = true
+  rememberSidebarScroll({ force: true })
+}
+
+function rememberSidebarScroll(options: { force?: boolean } = {}) {
+  if (isSidebarScrollLocked.value && !options.force) return
+
+  if (sidebarContentRef.value) {
+    sessionStorage.setItem(SIDEBAR_SCROLL_STORAGE_KEY, String(sidebarContentRef.value.scrollTop))
+  }
+}
+
+function getStoredSidebarScrollTop() {
+  const rawValue = sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY)
+  const scrollTop = rawValue ? Number(rawValue) : 0
+  return Number.isFinite(scrollTop) ? scrollTop : 0
+}
+
+async function restoreStoredSidebarScroll() {
+  const scrollTop = getStoredSidebarScrollTop()
+
+  await nextTick()
+  restoreSidebarScroll(scrollTop)
+  requestAnimationFrame(() => restoreSidebarScroll(scrollTop))
+  window.setTimeout(() => restoreSidebarScroll(scrollTop), 0)
+}
+
+function restoreSidebarScroll(scrollTop: number) {
+  if (sidebarContentRef.value) {
+    sidebarContentRef.value.scrollTop = scrollTop
+  }
+}
 
 </script>
 
@@ -137,6 +195,7 @@ const handleAdminMenuClick = ({ key }: { key: string }) => {
 .sidebar-content {
   height: calc(100% - 48px);
   overflow-y: auto;
+  overflow-anchor: none;
 }
 
 .navigation-groups-section {

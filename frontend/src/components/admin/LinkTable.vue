@@ -20,7 +20,7 @@
         </template>
 
         <template v-else-if="column.key === 'url'">
-          <a :href="record.url" target="_blank" rel="noopener noreferrer">
+          <a :href="safeHref(record.url)" target="_blank" rel="noopener noreferrer">
             {{ truncateUrl(record.url) }}
           </a>
         </template>
@@ -57,6 +57,7 @@
 import { computed } from 'vue'
 import type { TableProps, TableColumnType } from 'ant-design-vue'
 import type { Link, NavigationGroup } from '@/types'
+import { safeHref } from '@/utils/url'
 
 interface Props {
   links: Link[]

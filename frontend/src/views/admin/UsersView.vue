@@ -11,6 +11,9 @@
       <UserTable
         :users="usersStore.users"
         :loading="usersStore.loading"
+        :total="usersStore.total"
+        :current-page="currentPage"
+        :page-size="pageSize"
         @edit="handleEdit"
         @delete="handleDelete"
         @reset-password="handleResetPassword"
@@ -18,6 +21,7 @@
         @enable="handleEnable"
         @view-assets="handleViewAssets"
         @unlock="handleUnlock"
+        @page-change="handlePageChange"
       />
 
       <UserModal
@@ -60,7 +64,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import { confirmAction } from '@/utils/confirm'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import UserTable from '@/components/users/UserTable.vue'
 import UserModal from '@/components/users/UserModal.vue'
@@ -84,17 +89,36 @@ const assetsTargetName = ref('')
 const assetsTargetUser = ref<User | null>(null)
 const authorizedAssets = ref<AuthorizedAssets | null>(null)
 const assetsLoading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+const loadUsers = async () => {
+  await usersStore.fetchUsers({
+    skip: (currentPage.value - 1) * pageSize.value,
+    limit: pageSize.value
+  })
+}
 
 onMounted(async () => {
   try {
     await Promise.all([
-      usersStore.fetchUsers(),
+      loadUsers(),
       userGroupsStore.fetchUserGroups()
     ])
   } catch (error) {
     message.error('加载用户失败')
   }
 })
+
+const handlePageChange = async (page: number, size: number) => {
+  currentPage.value = page
+  pageSize.value = size
+  try {
+    await loadUsers()
+  } catch (error) {
+    message.error('加载用户失败')
+  }
+}
 
 const handleCreate = () => {
   selectedUser.value = null
@@ -129,11 +153,11 @@ const handleModalCancel = () => {
 }
 
 const handleDelete = (user: User) => {
-  Modal.confirm({
+  confirmAction({
     title: '删除用户',
     content: `确定要删除用户"${user.username}"吗？此操作不可撤销。`,
     okText: '删除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await usersStore.deleteUser(user.id)
@@ -172,11 +196,11 @@ const handleResetPasswordSubmit = async () => {
 }
 
 const handleDisable = (user: User) => {
-  Modal.confirm({
+  confirmAction({
     title: '禁用用户',
     content: `确定要禁用用户"${user.username}"吗？`,
     okText: '禁用',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await usersStore.disableUser(user.id)
@@ -189,7 +213,7 @@ const handleDisable = (user: User) => {
 }
 
 const handleEnable = (user: User) => {
-  Modal.confirm({
+  confirmAction({
     title: '启用用户',
     content: `确定要启用用户"${user.username}"吗？`,
     okText: '启用',
@@ -255,7 +279,7 @@ const handleRevokeLink = async (asset: LinkAsset) => {
 }
 
 const handleUnlock = (user: User) => {
-  Modal.confirm({
+  confirmAction({
     title: '解锁用户',
     content: `确定要解锁用户"${user.username}"吗？这将清除登录失败次数限制。`,
     okText: '解锁',
@@ -263,7 +287,7 @@ const handleUnlock = (user: User) => {
       try {
         await usersApi.unlock(user.id)
         message.success('用户已解锁')
-        await usersStore.fetchUsers()
+        await usersStore.fetchUsers({ skip: (currentPage.value - 1) * pageSize.value, limit: pageSize.value })
       } catch (error) {
         message.error('解锁用户失败')
       }

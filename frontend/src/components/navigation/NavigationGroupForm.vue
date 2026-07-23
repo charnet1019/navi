@@ -133,7 +133,7 @@ watch(() => props.initialValues, (newValues) => {
     formState.sort_order = newValues.sort_order || 0
     formState.parent_id = newValues.parent_id || null
   }
-}, { deep: true })
+})
 
 const handleSubmit = () => {
   const values: CreateNavigationGroupRequest | UpdateNavigationGroupRequest = {

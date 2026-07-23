@@ -1,8 +1,10 @@
 """Permission checking utilities with Redis caching."""
 
 import json
+import logging
 from typing import Set
 from uuid import UUID
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,6 +14,7 @@ from app.models.role import Role
 from app.models.permission import Permission
 from app.redis import get_redis
 
+logger = logging.getLogger(__name__)
 
 PERMISSION_CACHE_TTL = 300  # 5 minutes
 
@@ -25,7 +28,6 @@ async def get_user_permissions(
 
     Permissions are aggregated from:
     - User's direct roles
-    - User's group roles
 
     Args:
         user_id: User ID to get permissions for
@@ -42,9 +44,9 @@ async def get_user_permissions(
         cached = await redis.get(cache_key)
         if cached:
             return set(json.loads(cached))
-    except Exception as e:
-        # Log but don't fail if Redis is unavailable
-        print(f"Redis cache read failed: {e}")
+    except (RedisError, json.JSONDecodeError):
+        # Don't fail if Redis is unavailable or cache entry is corrupted
+        logger.warning("Redis permission cache read failed for user %s", user_id, exc_info=True)
 
     # Fetch from database
     permissions = await _fetch_user_permissions_from_db(user_id, db)
@@ -56,8 +58,8 @@ async def get_user_permissions(
             PERMISSION_CACHE_TTL,
             json.dumps(list(permissions))
         )
-    except Exception as e:
-        print(f"Redis cache write failed: {e}")
+    except RedisError:
+        logger.warning("Redis permission cache write failed for user %s", user_id, exc_info=True)
 
     return permissions
 
@@ -137,5 +139,5 @@ async def invalidate_user_permissions_cache(user_id: UUID) -> None:
 
     try:
         await redis.delete(cache_key)
-    except Exception as e:
-        print(f"Redis cache invalidation failed: {e}")
+    except RedisError:
+        logger.warning("Redis permission cache invalidation failed for user %s", user_id, exc_info=True)

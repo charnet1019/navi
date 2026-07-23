@@ -199,13 +199,13 @@ const permissionColumns = [
 
 onMounted(async () => {
   try {
-    const [groups, allUsers, allGroups] = await Promise.all([
+    const [groups, usersPage, allGroups] = await Promise.all([
       navigationApi.list(),
       usersApi.list({ limit: 100 }),
       userGroupsApi.list({ limit: 100 })
     ])
     navGroups.value = groups
-    users.value = allUsers
+    users.value = usersPage.users
     userGroups.value = allGroups
   } catch {
     message.error('加载数据失败')

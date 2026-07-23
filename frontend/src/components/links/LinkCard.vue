@@ -2,8 +2,14 @@
   <a-card
     :hoverable="true"
     class="link-card"
-    @click="handleClick"
   >
+    <a
+      class="link-card-hit-area"
+      :href="safeHref(link.url)"
+      :target="link.open_in_new_tab ? '_blank' : '_self'"
+      :rel="link.open_in_new_tab ? 'noopener noreferrer' : undefined"
+      :aria-label="link.name + ': ' + link.url"
+    />
     <div class="link-card-top-actions" @click.stop>
       <a-button
         type="text"
@@ -46,6 +52,7 @@
 <script setup lang="ts">
 import { LinkOutlined, EditOutlined, DeleteOutlined, StarOutlined, StarFilled } from '@ant-design/icons-vue'
 import type { Link } from '@/types'
+import { safeHref } from '@/utils/url'
 
 interface Props {
   link: Link
@@ -66,11 +73,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-const handleClick = () => {
-  const target = props.link.open_in_new_tab ? '_blank' : '_self'
-  window.open(props.link.url, target, 'noopener,noreferrer')
-}
-
 const handleEdit = () => emit('edit', props.link)
 const handleDelete = () => emit('delete', props.link)
 const handleToggleFavorite = () => emit('toggleFavorite', props.link.id)
@@ -87,6 +89,18 @@ const handleToggleFavorite = () => emit('toggleFavorite', props.link.id)
   padding: 12px;
 }
 
+.link-card-hit-area {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.link-card-hit-area:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
 .link-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
@@ -100,7 +114,7 @@ const handleToggleFavorite = () => emit('toggleFavorite', props.link.id)
   gap: 2px;
   opacity: 0;
   transition: opacity 0.2s;
-  z-index: 1;
+  z-index: 2;
 }
 
 .link-card:hover .link-card-top-actions {
@@ -119,6 +133,9 @@ const handleToggleFavorite = () => emit('toggleFavorite', props.link.id)
 .link-card-content {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .link-card-header {

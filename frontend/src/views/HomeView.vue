@@ -59,7 +59,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
+import { confirmAction } from '@/utils/confirm'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LinkGrid from '@/components/links/LinkGrid.vue'
 import LinkModal from '@/components/admin/LinkModal.vue'
@@ -83,21 +84,18 @@ const selectedGroup = computed(() => navigationStore.selectedGroup)
 
 const filteredLinks = computed(() => {
   if (!selectedGroup.value) return []
-  return linksStore.links
-    .filter(link => link.navigation_group_id === selectedGroup.value?.id && link.is_active)
-    .sort((a, b) => a.sort_order - b.sort_order)
+  return linksStore.linksByGroup[selectedGroup.value.id] ?? []
 })
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      navigationStore.selectedGroupId
-        ? linksStore.fetchLinks({ navigation_group_id: navigationStore.selectedGroupId, is_active: true })
-        : linksStore.fetchLinks({ is_active: true }),
-      settingsStore.fetchPublicSettings(),
-      favoritesStore.fetchFavoriteIds(),
-      favoritesStore.fetchFavoriteLinks()
-    ])
+    const tasks = [settingsStore.fetchPublicSettings(), favoritesStore.fetchFavoriteIds()]
+    if (navigationStore.selectedGroupId) {
+      tasks.push(linksStore.fetchLinks({ navigation_group_id: navigationStore.selectedGroupId, is_active: true }))
+    } else {
+      tasks.push(favoritesStore.fetchFavoriteLinks())
+    }
+    await Promise.all(tasks)
   } catch (error) {
     message.error('加载数据失败')
   }
@@ -150,11 +148,11 @@ const handleEditLink = (link: Link) => {
 }
 
 const handleDeleteLink = (link: Link) => {
-  Modal.confirm({
+  confirmAction({
     title: '删除链接',
     content: `确定要删除"${link.name}"吗？`,
     okText: '删除',
-    okType: 'danger',
+    danger: true,
     onOk: async () => {
       try {
         await linksStore.deleteLink(link.id)
@@ -173,7 +171,9 @@ const handleDeleteLink = (link: Link) => {
 const handleToggleFavorite = async (linkId: string) => {
   try {
     await favoritesStore.toggleFavorite(linkId)
-    await favoritesStore.fetchFavoriteLinks()
+    if (!selectedGroup.value) {
+      await favoritesStore.fetchFavoriteLinks()
+    }
   } catch {
     message.error('更新收藏失败')
   }

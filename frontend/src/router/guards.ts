@@ -1,13 +1,13 @@
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-async function ensureUser(): Promise<boolean> {
+async function ensureUser(options: { skipAuthRefresh?: boolean } = {}): Promise<boolean> {
   const authStore = useAuthStore()
-  if (authStore.accessToken && !authStore.user) {
+  if (!authStore.user) {
     try {
-      await authStore.fetchCurrentUser()
+      await authStore.fetchCurrentUser({ skipAuthRefresh: options.skipAuthRefresh })
     } catch {
-      await authStore.logout()
+      authStore.clearSession()
       return false
     }
   }
@@ -50,7 +50,7 @@ export async function guestGuard(
   _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ): Promise<void> {
-  const authenticated = await ensureUser()
+  const authenticated = await ensureUser({ skipAuthRefresh: true })
 
   if (authenticated) {
     next({ name: 'home' })

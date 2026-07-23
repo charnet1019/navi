@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: navi-backend
   namespace: navi
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: backend
+      app: navi-backend
   template:
     metadata:
       labels:
-        app: backend
+        app: navi-backend
     spec:
       containers:
-        - name: backend
+        - name: navi-backend
           image: your-registry/navi-backend:latest
           ports:
             - containerPort: 8000
@@ -66,11 +66,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: backend
+  name: navi-backend
   namespace: navi
 spec:
   selector:
-    app: backend
+    app: navi-backend
   ports:
     - port: 8000
       targetPort: 8000

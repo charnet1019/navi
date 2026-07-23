@@ -22,8 +22,31 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Auth Cookies
+    AUTH_ACCESS_COOKIE_NAME: str = "navi_access_token"
+    AUTH_REFRESH_COOKIE_NAME: str = "navi_refresh_token"
+    AUTH_CSRF_COOKIE_NAME: str = "navi_csrf_token"
+    AUTH_CSRF_HEADER_NAME: str = "X-CSRF-Token"
+    AUTH_COOKIE_SECURE: bool = False
+    AUTH_COOKIE_SAMESITE: str = "lax"
+    AUTH_COOKIE_DOMAIN: str | None = None
+
     # CORS
-    CORS_ORIGINS: str = "*"
+    CORS_ORIGINS: str = ""
+    CORS_ALLOW_CREDENTIALS: bool = True
+
+    @computed_field
+    @property
+    def auth_cookie_samesite(self) -> str:
+        return self.AUTH_COOKIE_SAMESITE.strip().lower()
+
+    @computed_field
+    @property
+    def auth_cookie_domain(self) -> str | None:
+        if self.AUTH_COOKIE_DOMAIN is None:
+            return None
+        domain = self.AUTH_COOKIE_DOMAIN.strip()
+        return domain or None
 
     @computed_field
     @property
@@ -34,13 +57,18 @@ class Settings(BaseSettings):
         if v.startswith("["):
             import json
             return json.loads(v)
-        return [s.strip() for s in v.split(",")]
+        return [s.strip() for s in v.split(",") if s.strip()]
+
+    @computed_field
+    @property
+    def cors_allow_credentials(self) -> bool:
+        return self.CORS_ALLOW_CREDENTIALS and "*" not in self.cors_origins_list
 
     # File Upload
     UPLOAD_DIR: str = "/app/uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_IMAGE_EXTENSIONS: set[str] = {
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",  # 常见格式
+        ".png", ".jpg", ".jpeg", ".gif", ".webp",  # 常见格式
         ".ico",  # Windows图标
         ".bmp",  # 位图
         ".tiff", ".tif",  # TIFF格式

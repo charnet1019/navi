@@ -12,9 +12,11 @@ export const usersApi = {
     skip?: number
     limit?: number
     is_active?: boolean
-  }): Promise<User[]> {
+  }): Promise<{ users: User[]; total: number }> {
     const response = await apiClient.get<User[]>('/users/', { params })
-    return response.data
+    const totalHeader = response.headers['x-total-count']
+    const total = totalHeader !== undefined ? Number(totalHeader) : response.data.length
+    return { users: response.data, total }
   },
 
   async getById(id: string): Promise<User> {
